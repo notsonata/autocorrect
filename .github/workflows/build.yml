@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: macos-15
@@ -139,3 +143,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -only-testing:AutocorrectProvidersTests/CorrectionRequestTests \
             test
+
+      - name: Test shared keychain group resolution
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/SharedKeychainAccessGroupTests \
+            test
+
+      - name: Build unsigned release package
+        run: zsh scripts/package-release.sh --unsigned
+
+      - name: Verify release package layout
+        run: |
+          test -f dist/Autocorrect-0.1.0-macOS.zip
+          test -f dist/Autocorrect-0.1.0-macOS.zip.sha256
+          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Install Autocorrect.app/"
+          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Autocorrect.app/"
+          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Autocorrect Settings.app/"

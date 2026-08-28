@@ -14,9 +14,14 @@ public enum ProviderCredentialStoreError: Error, Equatable {
 
 public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked Sendable {
     private let service: String
+    private let accessGroup: String?
 
-    public init(service: String = "dev.notsonata.autocorrect.providers") {
+    public init(
+        service: String = "dev.notsonata.autocorrect.providers",
+        accessGroup: String? = SharedKeychainAccessGroup.current()
+    ) {
         self.service = service
+        self.accessGroup = accessGroup
     }
 
     public func apiKey(for providerIdentifier: String) throws -> String? {
@@ -77,11 +82,17 @@ public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked 
     }
 
     private func baseQuery(providerIdentifier: String) -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: providerIdentifier,
             kSecUseDataProtectionKeychain as String: true
         ]
+
+        if let accessGroup, !accessGroup.isEmpty {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        return query
     }
 }
