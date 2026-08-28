@@ -18,8 +18,20 @@ final class AutocorrectInputController: IMKInputController {
         let clientID = ObjectIdentifier(client)
         synchronizeSession(with: clientID)
 
-        // Fail closed. In a secure or otherwise unverifiable field we immediately
-        // purge any pending words and pass the new input through without inspection.
+        // Ordinary input is never text-inspected. We only track its document mutation
+        // so outstanding correction ranges can stay anchored while the user types.
+        guard string == " " else {
+            let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
+            IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
+            recordUserMutation(
+                replacing: selectionBeforeInsertion,
+                withUTF16Length: string.utf16.count
+            )
+            return true
+        }
+
+        // A correction boundary is the only point where surrounding text is inspected.
+        // Fail closed before reading it if the focused field is secure or unverifiable.
         guard AccessibilityGate.safeFocusedField() != nil else {
             pendingCorrections.cancelAll()
             IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
@@ -27,18 +39,16 @@ final class AutocorrectInputController: IMKInputController {
         }
 
         let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
-        let snapshot = string == " " ? WordSnapshot.capture(from: client) : nil
+        let snapshot = WordSnapshot.capture(from: client)
 
-        // User input is always inserted synchronously. Correction work only starts
-        // after the boundary has already reached the client.
+        // Space reaches the client immediately. No correction work blocks normal typing.
         IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
         recordUserMutation(
             replacing: selectionBeforeInsertion,
             withUTF16Length: string.utf16.count
         )
 
-        guard string == " ",
-              let snapshot,
+        guard let snapshot,
               let plan = PrototypeCorrectionEngine.correction(for: snapshot.original),
               plan.replacement != snapshot.original else {
             return true
@@ -99,6 +109,8 @@ final class AutocorrectInputController: IMKInputController {
             return
         }
 
+        // Re-check the privacy boundary at completion time because focus may have moved
+        // into a password or secure field while the asynchronous job was pending.
         guard let fieldAccess = AccessibilityGate.safeFocusedField() else {
             pendingCorrections.cancelAll()
             return
