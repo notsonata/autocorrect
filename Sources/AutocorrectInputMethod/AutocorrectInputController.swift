@@ -8,7 +8,7 @@ import InputMethodKit
 final class AutocorrectInputController: IMKInputController {
     private static let insertionPoint = NSRange(location: NSNotFound, length: NSNotFound)
     private static let settingsCache = RuntimeSettingsCache()
-    private static let credentialStore: ProviderCredentialStore = KeychainCredentialStore()
+    private static let credentialStore: ProviderCredentialStore = LocalCredentialStore()
 
     private var activeClientID: ObjectIdentifier?
     private var pendingCorrections = PendingCorrectionLedger()
@@ -55,7 +55,7 @@ final class AutocorrectInputController: IMKInputController {
         let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
         let snapshot = WordSnapshot.capture(from: client)
 
-        // The boundary reaches the client immediately. No spell checking, Keychain lookup,
+        // The boundary reaches the client immediately. No spell checking, credential lookup,
         // or network work is allowed to delay normal typing.
         IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
         recordUserMutation(
