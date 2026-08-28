@@ -42,6 +42,8 @@ final class SharedAutocorrectSettingsTests: XCTestCase {
         XCTAssertTrue(snapshot.isEnabled)
         XCTAssertTrue(snapshot.privacyAcknowledged)
         XCTAssertEqual(snapshot.selectedProvider, .openRouter)
+        XCTAssertEqual(snapshot.selectedProvider.rawValue, "openrouter")
+        XCTAssertEqual(snapshot.credentialIdentifier, "openrouter")
         XCTAssertEqual(snapshot.openRouterModel, "anthropic/claude-sonnet-4.6")
         XCTAssertEqual(
             snapshot.excludedBundleIdentifiers,

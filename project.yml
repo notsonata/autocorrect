@@ -80,6 +80,7 @@ targets:
         INFOPLIST_FILE: Sources/AutocorrectInputMethod/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SWIFT_OBJC_BRIDGING_HEADER: Sources/AutocorrectInputMethod/AutocorrectInputMethod-Bridging-Header.h
+        CODE_SIGN_ENTITLEMENTS: Configuration/AutocorrectShared.entitlements
         ENABLE_HARDENED_RUNTIME: YES
 
   AutocorrectMenuBar:
@@ -97,6 +98,7 @@ targets:
         PRODUCT_NAME: Autocorrect Settings
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
+        CODE_SIGN_ENTITLEMENTS: Configuration/AutocorrectShared.entitlements
         ENABLE_HARDENED_RUNTIME: YES
 
   AutocorrectCoreTests:

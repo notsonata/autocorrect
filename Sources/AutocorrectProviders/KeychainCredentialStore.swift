@@ -80,7 +80,8 @@ public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked 
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: providerIdentifier
+            kSecAttrAccount as String: providerIdentifier,
+            kSecUseDataProtectionKeychain as String: true
         ]
     }
 }
