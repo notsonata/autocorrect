@@ -8,10 +8,10 @@ struct SettingsView: View {
         Form {
             Section("General") {
                 Toggle("Enable autocorrect", isOn: $model.isEnabled)
-                    .disabled(!model.privacyAcknowledged)
+                    .disabled(!model.privacyAcknowledged || !model.inputMethodInstalled)
 
                 Toggle(
-                    "Launch settings app at login",
+                    "Launch Autocorrect at login",
                     isOn: Binding(
                         get: { model.launchAtLogin },
                         set: { model.setLaunchAtLogin($0) }
@@ -23,6 +23,32 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section("Input Method") {
+                HStack {
+                    Label(
+                        model.inputMethodInstalled ? "Installed" : "Not installed",
+                        systemImage: model.inputMethodInstalled ? "checkmark.circle.fill" : "exclamationmark.triangle"
+                    )
+                    Spacer()
+                    Button("Repair") {
+                        model.repairInputMethod()
+                    }
+                    Button("Keyboard Settings") {
+                        model.openKeyboardSettings()
+                    }
+                }
+
+                if let message = model.inputMethodMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Autocorrect carries its input method inside this app and installs it automatically for the current user in ~/Library/Input Methods.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("AI Provider") {

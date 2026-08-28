@@ -149,7 +149,7 @@ jobs:
             -only-testing:AutocorrectProvidersTests/CorrectionRequestTests \
             test
 
-      - name: Test shared keychain group resolution
+      - name: Test keychain sharing paths
         run: |
           xcodebuild \
             -project Autocorrect.xcodeproj \
@@ -161,7 +161,7 @@ jobs:
             -only-testing:AutocorrectProvidersTests/LegacyKeychainAccessTests \
             test
 
-      - name: Build unsigned release package
+      - name: Build community release package
         run: zsh scripts/package-release.sh --unsigned
 
       - name: Read release version
@@ -172,24 +172,24 @@ jobs:
           test -n "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Verify release package layout
+      - name: Verify single-app release layout
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          test -f "dist/Autocorrect-$VERSION-macOS.zip"
-          test -f "dist/Autocorrect-$VERSION-macOS.zip.sha256"
-          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Install Autocorrect.app/"
-          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Autocorrect.app/"
-          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Autocorrect Settings.app/"
+          ZIP="dist/Autocorrect-$VERSION-macOS.zip"
+          test -f "$ZIP"
+          ENTRIES="$(unzip -Z1 "$ZIP")"
+          printf '%s\n' "$ENTRIES" | grep -Fq "Autocorrect.app/Contents/MacOS/Autocorrect"
+          printf '%s\n' "$ENTRIES" | grep -Fq "Autocorrect.app/Contents/Resources/InputMethod/Autocorrect.app/"
+          TOP_LEVEL="$(printf '%s\n' "$ENTRIES" | awk -F/ 'NF > 1 {print $1}' | sort -u)"
+          test "$TOP_LEVEL" = "Autocorrect.app"
 
-      - name: Upload unsigned package artifact
+      - name: Upload macOS package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Autocorrect-${{ steps.version.outputs.version }}-macOS-unsigned
-          path: |
-            dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip
-            dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip.sha256
+          name: Autocorrect-${{ steps.version.outputs.version }}-macOS
+          path: dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip
           if-no-files-found: error
 
   publish-community-release:
@@ -199,13 +199,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download tested community package
+      - name: Download tested macOS package
         uses: actions/download-artifact@v4
         with:
-          name: Autocorrect-${{ needs.build-and-test.outputs.version }}-macOS-unsigned
+          name: Autocorrect-${{ needs.build-and-test.outputs.version }}-macOS
           path: dist
 
-      - name: Auto-tag and publish unsigned GitHub release
+      - name: Auto-tag and publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build-and-test.outputs.version }}
@@ -221,8 +221,7 @@ jobs:
 
           gh release create "$TAG" \
             "dist/Autocorrect-$VERSION-macOS.zip" \
-            "dist/Autocorrect-$VERSION-macOS.zip.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$RELEASE_SHA" \
             --title "Autocorrect $VERSION" \
-            --notes "Unsigned community build generated automatically from main. No paid Apple Developer account is required. macOS Gatekeeper may require manual approval before first launch."
+            --notes "Single-app macOS community build. Drag Autocorrect.app to Applications, open it once, and it installs its embedded input method for the current user. This build is ad-hoc signed rather than Developer ID notarized, so macOS may require Open Anyway on first launch."
