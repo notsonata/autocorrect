@@ -24,24 +24,7 @@ public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unch
             throw CorrectionProviderError.notAuthenticated
         }
 
-        var urlRequest = URLRequest(url: configuration.chatCompletionsURL)
-        urlRequest.httpMethod = "POST"
-        urlRequest.cachePolicy = .reloadIgnoringLocalCacheData
-        urlRequest.timeoutInterval = 4
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        urlRequest.httpBody = try JSONEncoder().encode(
-            ChatCompletionRequest(
-                model: configuration.model,
-                reasoningEffort: configuration.reasoningEffort,
-                messages: [
-                    .init(role: "system", content: Self.systemPrompt),
-                    .init(role: "user", content: request.providerInput)
-                ],
-                responseFormat: .correctionSchema
-            )
-        )
-
+        let urlRequest = try makeURLRequest(for: request, apiKey: apiKey)
         let (data, response) = try await session.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CorrectionProviderError.invalidResponse
@@ -71,6 +54,29 @@ public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unch
         }
 
         return CorrectionResponse(replacement: payload.replacement)
+    }
+
+    /// Kept internal so tests can verify the complete wire request before URLSession
+    /// converts its body into a stream. No typed text is logged or persisted here.
+    func makeURLRequest(for request: CorrectionRequest, apiKey: String) throws -> URLRequest {
+        var urlRequest = URLRequest(url: configuration.chatCompletionsURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.cachePolicy = .reloadIgnoringLocalCacheData
+        urlRequest.timeoutInterval = 4
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.httpBody = try JSONEncoder().encode(
+            ChatCompletionRequest(
+                model: configuration.model,
+                reasoningEffort: configuration.reasoningEffort,
+                messages: [
+                    .init(role: "system", content: Self.systemPrompt),
+                    .init(role: "user", content: request.providerInput)
+                ],
+                responseFormat: .correctionSchema
+            )
+        )
+        return urlRequest
     }
 
     private static func makeEphemeralSession() -> URLSession {
