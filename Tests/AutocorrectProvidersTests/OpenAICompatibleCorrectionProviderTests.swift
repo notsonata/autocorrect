@@ -34,7 +34,7 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
             XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
 
-            let body = try XCTUnwrap(request.httpBody)
+            let body = try requestBodyData(request)
             let json = try XCTUnwrap(
                 JSONSerialization.jsonObject(with: body) as? [String: Any]
             )
@@ -155,6 +155,41 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
         configuration.httpShouldSetCookies = false
         return URLSession(configuration: configuration)
     }
+}
+
+private func requestBodyData(_ request: URLRequest) throws -> Data {
+    if let body = request.httpBody {
+        return body
+    }
+
+    guard let stream = request.httpBodyStream else {
+        throw URLError(.zeroByteResource)
+    }
+
+    stream.open()
+    defer { stream.close() }
+
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 4096)
+
+    while true {
+        let readCount = buffer.withUnsafeMutableBufferPointer { pointer in
+            guard let baseAddress = pointer.baseAddress else { return 0 }
+            return stream.read(baseAddress, maxLength: pointer.count)
+        }
+
+        if readCount < 0 {
+            throw stream.streamError ?? URLError(.cannotDecodeContentData)
+        }
+
+        if readCount == 0 {
+            break
+        }
+
+        data.append(contentsOf: buffer.prefix(readCount))
+    }
+
+    return data
 }
 
 private final class InMemoryCredentialStore: ProviderCredentialStore, @unchecked Sendable {
