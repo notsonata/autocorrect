@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -16,6 +16,8 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: macos-15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -190,16 +192,29 @@ jobs:
             dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip.sha256
           if-no-files-found: error
 
+  publish-community-release:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested community package
+        uses: actions/download-artifact@v4
+        with:
+          name: Autocorrect-${{ needs.build-and-test.outputs.version }}-macOS-unsigned
+          path: dist
+
       - name: Auto-tag and publish unsigned GitHub release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build-and-test.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           TAG="v$VERSION"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists; leaving it unchanged."
             exit 0
           fi
@@ -207,6 +222,7 @@ jobs:
           gh release create "$TAG" \
             "dist/Autocorrect-$VERSION-macOS.zip" \
             "dist/Autocorrect-$VERSION-macOS.zip.sha256" \
-            --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
             --title "Autocorrect $VERSION" \
             --notes "Unsigned community build generated automatically from main. No paid Apple Developer account is required. macOS Gatekeeper may require manual approval before first launch."
