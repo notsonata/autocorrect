@@ -4,8 +4,8 @@ Autocorrect requires macOS 14 or later.
 
 ## Install
 
-1. Keep `Autocorrect.app`, `Autocorrect Settings.app`, and `Install Autocorrect.command` together in the extracted release folder.
-2. Double-click `Install Autocorrect.command`.
+1. Keep `Install Autocorrect.app`, `Autocorrect.app`, and `Autocorrect Settings.app` together in the extracted release folder.
+2. Open `Install Autocorrect.app` and click **Install Autocorrect**.
 3. Open **System Settings > Keyboard > Text Input > Edit** and add or enable **Autocorrect** as an input source.
 4. Grant the Autocorrect input method Accessibility permission when macOS requests it.
 5. Open **Autocorrect Settings** from the menu bar.
@@ -22,14 +22,14 @@ If the input source does not appear immediately after installation, log out and 
 
 ## Update
 
-Run the installer from the newer release. It replaces both app bundles while preserving preferences and Keychain credentials.
+Open `Install Autocorrect.app` from the newer release and install again. It replaces both installed app bundles while preserving preferences and Keychain credentials.
 
 ## Uninstall
 
-Double-click `Uninstall Autocorrect.command` from a release folder, or remove the two installed app bundles manually.
+Open `Install Autocorrect.app` from a release folder and click **Uninstall**, or remove the two installed app bundles manually.
 
-The uninstaller intentionally preserves preferences and provider credentials. If you want an API key removed from Keychain, remove it from Autocorrect Settings before uninstalling.
+Uninstall intentionally preserves preferences and provider credentials. If you want an API key removed from Keychain, remove it from Autocorrect Settings before uninstalling.
 
 ## Gatekeeper
 
-Official release artifacts are intended to be signed with a Developer ID Application certificate and notarized by Apple. Do not bypass Gatekeeper or strip quarantine attributes from a release artifact.
+Official release artifacts are intended to contain Developer ID signed and Apple-notarized app bundles, including the installer. Do not bypass Gatekeeper or strip quarantine attributes from a release artifact.
