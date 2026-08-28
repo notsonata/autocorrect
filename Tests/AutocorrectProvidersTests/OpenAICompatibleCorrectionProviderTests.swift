@@ -59,20 +59,20 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
         let transport = MockHTTPTransport { request in
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
 
-            let responseJSON = """
-            {
-              "choices": [
-                {"message": {"content": "{\"replacement\":\"gagawin\"}"}}
-              ]
-            }
-            """
+            let structuredContent = #"{"replacement":"gagawin"}"#
+            let responseObject: [String: Any] = [
+                "choices": [
+                    ["message": ["content": structuredContent]]
+                ]
+            ]
+            let responseData = try JSONSerialization.data(withJSONObject: responseObject)
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 200,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (Data(responseJSON.utf8), response)
+            return (responseData, response)
         }
 
         let provider = OpenAICompatibleCorrectionProvider(
