@@ -3,12 +3,16 @@ import SwiftUI
 
 @main
 struct AutocorrectApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = SettingsViewModel()
 
     var body: some Scene {
-        Window("Autocorrect", id: "settings") {
+        WindowGroup("Autocorrect", id: "settings") {
             SettingsView(model: model)
                 .frame(width: 560, height: 690)
+                .onAppear {
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                }
         }
         .windowResizability(.contentSize)
 
