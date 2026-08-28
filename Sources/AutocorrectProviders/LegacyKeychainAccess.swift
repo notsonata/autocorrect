@@ -2,23 +2,39 @@ import Foundation
 import Security
 
 enum LegacyKeychainAccess {
-    static let inputMethodExecutableRelativePath = "Library/Input Methods/Autocorrect.app/Contents/MacOS/Autocorrect"
-    static let settingsExecutableRelativePath = "Applications/Autocorrect Settings.app/Contents/MacOS/Autocorrect Settings"
+    static let inputMethodExecutableRelativePath = "Library/Input Methods/Autocorrect.app/Contents/MacOS/AutocorrectInputMethod"
+    static let userApplicationsExecutableRelativePath = "Applications/Autocorrect.app/Contents/MacOS/Autocorrect"
+    static let systemApplicationsExecutablePath = "/Applications/Autocorrect.app/Contents/MacOS/Autocorrect"
 
-    static func trustedExecutablePaths(
+    static func candidateExecutablePaths(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> [String] {
         [
             homeDirectory.appendingPathComponent(inputMethodExecutableRelativePath).path,
-            homeDirectory.appendingPathComponent(settingsExecutableRelativePath).path
+            systemApplicationsExecutablePath,
+            homeDirectory.appendingPathComponent(userApplicationsExecutableRelativePath).path
         ]
+    }
+
+    static func trustedExecutablePaths(
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fileManager: FileManager = .default
+    ) -> [String] {
+        candidateExecutablePaths(homeDirectory: homeDirectory)
+            .filter { fileManager.fileExists(atPath: $0) }
     }
 
     static func makeAccess(
         trustedExecutablePaths paths: [String] = trustedExecutablePaths(),
         fileManager: FileManager = .default
     ) throws -> SecAccess {
-        guard !paths.isEmpty,
+        let hasInputMethod = paths.contains { $0.hasSuffix(inputMethodExecutableRelativePath) }
+        let hasMainApplication = paths.contains { path in
+            path == systemApplicationsExecutablePath || path.hasSuffix(userApplicationsExecutableRelativePath)
+        }
+
+        guard hasInputMethod,
+              hasMainApplication,
               paths.allSatisfy({ fileManager.fileExists(atPath: $0) }) else {
             throw ProviderCredentialStoreError.unsignedSharingUnavailable
         }

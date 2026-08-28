@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 final class SettingsViewModel: ObservableObject {
     private let settings: SharedAutocorrectSettings
     private let credentialStore: ProviderCredentialStore
+    private let inputMethodInstaller: InputMethodInstaller
 
     @Published var isEnabled: Bool {
         didSet { settings.isEnabled = isEnabled }
@@ -53,13 +54,17 @@ final class SettingsViewModel: ObservableObject {
     @Published private(set) var credentialMessage: String?
     @Published private(set) var launchAtLogin: Bool
     @Published private(set) var launchServiceMessage: String?
+    @Published private(set) var inputMethodInstalled = false
+    @Published private(set) var inputMethodMessage: String?
 
     init(
         settings: SharedAutocorrectSettings = SharedAutocorrectSettings(),
-        credentialStore: ProviderCredentialStore = KeychainCredentialStore()
+        credentialStore: ProviderCredentialStore = KeychainCredentialStore(),
+        inputMethodInstaller: InputMethodInstaller = InputMethodInstaller()
     ) {
         self.settings = settings
         self.credentialStore = credentialStore
+        self.inputMethodInstaller = inputMethodInstaller
 
         let snapshot = settings.snapshot()
         self.isEnabled = snapshot.isEnabled
@@ -72,7 +77,42 @@ final class SettingsViewModel: ObservableObject {
         self.excludedBundleIdentifiers = Array(snapshot.excludedBundleIdentifiers).sorted()
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
 
+        installInputMethodIfNeeded()
         refreshCredentialStatus()
+    }
+
+    func installInputMethodIfNeeded() {
+        do {
+            let changed = try inputMethodInstaller.installIfNeeded()
+            inputMethodInstalled = true
+            inputMethodMessage = changed
+                ? "Input method installed. Enable Autocorrect in System Settings > Keyboard > Text Input > Edit."
+                : "Input method is installed."
+        } catch {
+            inputMethodInstalled = inputMethodInstaller.isInstalled()
+            inputMethodMessage = "Could not install the embedded input method: \(error.localizedDescription)"
+            if !inputMethodInstalled && isEnabled {
+                isEnabled = false
+            }
+        }
+    }
+
+    func repairInputMethod() {
+        do {
+            try inputMethodInstaller.reinstall()
+            inputMethodInstalled = true
+            inputMethodMessage = "Input method reinstalled. Enable Autocorrect in System Settings > Keyboard > Text Input > Edit."
+        } catch {
+            inputMethodInstalled = inputMethodInstaller.isInstalled()
+            inputMethodMessage = "Could not reinstall the input method: \(error.localizedDescription)"
+        }
+    }
+
+    func openKeyboardSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     func saveAPIKey() {

@@ -49,11 +49,9 @@ fi
 BUILD_DIR="$ROOT_DIR/.release-build"
 PRODUCTS_DIR="$BUILD_DIR/Build/Products/Release"
 DIST_DIR="$ROOT_DIR/dist"
-STAGE_ROOT="$DIST_DIR/stage"
-PACKAGE_DIR="$STAGE_ROOT/Autocorrect-$VERSION"
 ARCHIVE="$DIST_DIR/Autocorrect-$VERSION-macOS.zip"
 
-rm -rf "$BUILD_DIR" "$STAGE_ROOT" "$ARCHIVE" "$ARCHIVE.sha256"
+rm -rf "$BUILD_DIR" "$ARCHIVE"
 mkdir -p "$DIST_DIR"
 
 xcodegen generate
@@ -84,63 +82,44 @@ fi
 
 "${build_args[@]}"
 
-INPUT_APP="$PRODUCTS_DIR/Autocorrect.app"
-SETTINGS_APP="$PRODUCTS_DIR/Autocorrect Settings.app"
-INSTALLER_APP="$PRODUCTS_DIR/Autocorrect Installer.app"
+APP="$PRODUCTS_DIR/Autocorrect.app"
+EMBEDDED_INPUT="$APP/Contents/Resources/InputMethod/Autocorrect.app"
 
-for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
-  if [[ ! -d "$app" ]]; then
-    echo "Expected build product is missing: $app" >&2
-    exit 1
-  fi
-done
+if [[ ! -d "$APP" ]]; then
+  echo "Expected build product is missing: $APP" >&2
+  exit 1
+fi
+
+if [[ ! -d "$EMBEDDED_INPUT" ]]; then
+  echo "Embedded input method is missing: $EMBEDDED_INPUT" >&2
+  exit 1
+fi
 
 if [[ "$MODE" == "signed" ]]; then
-  zsh scripts/release/verify-signed-release.sh \
-    "$INPUT_APP" \
-    "$SETTINGS_APP" \
-    "$INSTALLER_APP"
+  zsh scripts/release/verify-signed-release.sh "$APP"
 else
-  # A free community build has no Developer ID identity. Ad-hoc signing still
-  # gives each bundle a valid local code signature for macOS runtime/TCC and
-  # legacy Keychain trusted-application checks. It does not satisfy Gatekeeper
-  # as an identified developer and does not require an Apple Developer account.
-  for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
-    codesign --force --deep --sign - --options runtime "$app"
-    codesign --verify --deep --strict --verbose=2 "$app"
-  done
+  # Free community build: ad-hoc sign the embedded input method and then the
+  # outer app. This does not provide Developer ID trust or notarization.
+  codesign --force --deep --sign - --options runtime "$EMBEDDED_INPUT"
+  codesign --force --deep --sign - --options runtime "$APP"
+  codesign --verify --deep --strict --verbose=2 "$APP"
 fi
 
 if (( NOTARIZE )); then
   : "${AUTOCORRECT_NOTARY_PROFILE:?AUTOCORRECT_NOTARY_PROFILE is required with --notarize}"
-  NOTARY_DIR="$DIST_DIR/notary"
-  rm -rf "$NOTARY_DIR"
-  mkdir -p "$NOTARY_DIR"
+  NOTARY_ZIP="$DIST_DIR/Autocorrect-$VERSION-notary.zip"
+  rm -f "$NOTARY_ZIP"
 
-  for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
-    name="$(basename "$app" .app | tr ' ' '-')"
-    submission="$NOTARY_DIR/$name.zip"
-
-    ditto -c -k --sequesterRsrc --keepParent "$app" "$submission"
-    xcrun notarytool submit "$submission" \
-      --keychain-profile "$AUTOCORRECT_NOTARY_PROFILE" \
-      --wait
-    xcrun stapler staple "$app"
-    xcrun stapler validate "$app"
-    spctl --assess --type execute --verbose=4 "$app"
-  done
+  ditto -c -k --sequesterRsrc --keepParent "$APP" "$NOTARY_ZIP"
+  xcrun notarytool submit "$NOTARY_ZIP" \
+    --keychain-profile "$AUTOCORRECT_NOTARY_PROFILE" \
+    --wait
+  xcrun stapler staple "$APP"
+  xcrun stapler validate "$APP"
+  spctl --assess --type execute --verbose=4 "$APP"
+  rm -f "$NOTARY_ZIP"
 fi
 
-mkdir -p "$PACKAGE_DIR"
-ditto "$INSTALLER_APP" "$PACKAGE_DIR/Install Autocorrect.app"
-ditto "$INPUT_APP" "$PACKAGE_DIR/Autocorrect.app"
-ditto "$SETTINGS_APP" "$PACKAGE_DIR/Autocorrect Settings.app"
-cp docs/INSTALL.md "$PACKAGE_DIR/README.md"
-
-ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
-
-rm -rf "$STAGE_ROOT"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
 
 echo "Created $ARCHIVE"
-echo "SHA-256: $(cat "$ARCHIVE.sha256")"

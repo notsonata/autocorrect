@@ -1,107 +1,45 @@
 # Release Process
 
-Autocorrect is distributed as a per-user macOS ZIP containing three app bundles: the input method, the menu-bar settings companion, and a native installer with Install and Uninstall controls. Installation notes are included alongside them.
+Autocorrect is distributed as one ZIP containing one visible application bundle.
 
-## Default: automatic free GitHub release
+```text
+Autocorrect-<version>-macOS.zip
+└── Autocorrect.app
+```
 
-A paid Apple Developer account is not required for the default release path.
+The main app contains an embedded InputMethodKit app under `Contents/Resources/InputMethod/Autocorrect.app`. It installs that component into the current user's `~/Library/Input Methods` directory when launched.
 
-`MARKETING_VERSION` in `project.yml` is the version source of truth. After the full `Build` workflow succeeds on a push to `main`, GitHub Actions:
+## Community build
 
-1. builds the current version in Release mode,
-2. ad-hoc signs all three app bundles with the free `-` identity,
-3. verifies their local code signatures,
-4. creates `Autocorrect-<version>-macOS.zip` and its SHA-256 checksum,
-5. uploads both files as a workflow artifact,
-6. checks for GitHub Release `v<version>`,
-7. if the release does not exist, creates it against the exact successful commit and attaches both files.
-
-Creating the GitHub Release also creates the Git tag, so there is no separate manual tagging step for the community build.
-
-A later push that still uses the same `MARKETING_VERSION` leaves the existing release unchanged. Bump `MARKETING_VERSION` before publishing the next version.
-
-The community build is ad-hoc signed, not Developer ID signed or Apple-notarized. Users should expect Gatekeeper manual approval on first launch. See `docs/INSTALL.md`.
-
-## Pull-request artifacts
-
-Pull requests run the same package construction and upload the ZIP/checksum through `actions/upload-artifact`. They do not create a tag or GitHub Release. This makes it possible to download and test a candidate directly from the PR's Actions run before merge.
-
-## Local community package
-
-To produce the same free package locally:
+The default release path does not require an Apple Developer membership:
 
 ```sh
 zsh scripts/package-release.sh --unsigned
 ```
 
-Output:
+The build is ad-hoc signed after compilation so the app and its embedded input method have valid local code signatures. It is not Developer ID identified or notarized, so Gatekeeper may require manual approval on first launch.
 
-- `dist/Autocorrect-0.1.0-macOS.zip`
-- `dist/Autocorrect-0.1.0-macOS.zip.sha256`
+The command produces only:
 
-Despite the historical `--unsigned` option name, the final app bundles receive an ad-hoc local code signature after the Xcode build. No Apple certificate or paid membership is involved.
-
-## Keychain behavior without Developer ID
-
-Developer ID builds can use the shared application-group/data-protection Keychain path.
-
-When that entitlement is absent, `KeychainCredentialStore` uses the macOS file-based Keychain and creates the provider credential with an ACL trusting the installed executables at:
-
-- `~/Library/Input Methods/Autocorrect.app/Contents/MacOS/Autocorrect`
-- `~/Applications/Autocorrect Settings.app/Contents/MacOS/Autocorrect Settings`
-
-The API key remains a Keychain item. It is not placed in preferences, the release ZIP, logs, or a plaintext credential file.
-
-This fallback is a legacy macOS Keychain mechanism. Because trust is tied to the installed programs, an unsigned/ad-hoc update may cause macOS to request Keychain authorization again.
-
-## Optional Developer ID and notarized package
-
-If a polished public distribution is wanted later, the existing paid path remains available. The Mac must have a Developer ID Application identity available in Keychain. Store notarization credentials once with `notarytool`, then run:
-
-```sh
-xcrun notarytool store-credentials autocorrect-notary \
-  --apple-id "YOUR_APPLE_ID" \
-  --team-id "YOUR_TEAM_ID" \
-  --password "YOUR_APP_SPECIFIC_PASSWORD"
-
-AUTOCORRECT_TEAM_ID="YOUR_TEAM_ID" \
-AUTOCORRECT_SIGN_IDENTITY="Developer ID Application" \
-AUTOCORRECT_NOTARY_PROFILE="autocorrect-notary" \
-zsh scripts/package-release.sh --notarize
+```text
+dist/Autocorrect-<version>-macOS.zip
 ```
 
-The packaging script verifies all three app signatures and requires the Hardened Runtime. It also verifies that the input method and settings companion carry the same team-prefixed shared application/keychain group. It then submits all three apps to Apple notarization, staples the resulting tickets, asks Gatekeeper to assess the stapled apps, and creates the final ZIP and checksum.
+No checksum sidecar, installer app, settings app, or README is placed beside the application in the ZIP.
 
-The final ZIP contains:
+## GitHub automatic release
 
-- `Install Autocorrect.app`
-- `Autocorrect.app`
-- `Autocorrect Settings.app`
-- `README.md`
+A successful push to `main`:
 
-The installer copies only into per-user locations and does not require administrator privileges.
+1. builds and tests Autocorrect on a macOS runner,
+2. creates the single-app ZIP,
+3. uploads that ZIP as the workflow artifact,
+4. reads `MARKETING_VERSION` from `project.yml`,
+5. creates tag `v<MARKETING_VERSION>` if its GitHub Release does not already exist,
+6. publishes the ZIP as the only release asset.
 
-## Optional signed-release secrets
+The workflow never rewrites an existing versioned release. Bump `MARKETING_VERSION` before publishing the next release.
 
-The existing signed tag workflow requires these repository secrets if Developer ID distribution is enabled later:
+## Optional Developer ID build
 
-- `APPLE_CERTIFICATE_P12_BASE64`
-- `APPLE_CERTIFICATE_PASSWORD`
-- `APPLE_TEAM_ID`
-- `APPLE_ID`
-- `APPLE_APP_SPECIFIC_PASSWORD`
-
-No signing certificate, private key, Apple ID password, provider API key, or notarization credential belongs in the repository.
-
-## Release validation
-
-Before treating a community or signed build as stable:
-
-1. Download/extract the exact generated ZIP rather than running from DerivedData.
-2. Install through `Install Autocorrect.app`.
-3. Complete every required row in `docs/COMPATIBILITY.md`.
-4. Complete the installer and cross-process credential checks.
-5. Confirm secure fields remain pass-through only.
-6. Confirm the GitHub `Build` workflow is green for the release commit.
-
-The automated release mechanism proves the package was built from a green commit. It does not replace the manual real-application compatibility checks.
+`scripts/package-release.sh --signed` and `--notarize` remain available for a future paid Developer ID distribution path. The signing verifier checks both the outer app and embedded input method. This path is not required for community releases.
