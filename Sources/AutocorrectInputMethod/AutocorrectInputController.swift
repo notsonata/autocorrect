@@ -18,9 +18,11 @@ final class AutocorrectInputController: IMKInputController {
         let clientID = ObjectIdentifier(client)
         synchronizeSession(with: clientID)
 
+        let isBoundary = WordBoundaryDetector.triggersCorrection(for: string)
+
         // Ordinary input is never text-inspected. We only track its document mutation
         // so outstanding correction ranges can stay anchored while the user types.
-        guard string == " " else {
+        guard isBoundary else {
             let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
             IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
             recordUserMutation(
@@ -41,7 +43,7 @@ final class AutocorrectInputController: IMKInputController {
         let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
         let snapshot = WordSnapshot.capture(from: client)
 
-        // Space reaches the client immediately. No correction work blocks normal typing.
+        // The boundary reaches the client immediately. No correction work blocks typing.
         IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
         recordUserMutation(
             replacing: selectionBeforeInsertion,
