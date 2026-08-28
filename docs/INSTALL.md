@@ -18,13 +18,13 @@ There is no separate installer or settings application.
 
 Replace `/Applications/Autocorrect.app` with the newer version and open it once. The app compares the embedded input-method version with the installed copy and updates `~/Library/Input Methods/Autocorrect.app` automatically when needed.
 
-Preferences and Keychain credentials remain in place across updates.
+Preferences and locally stored provider credentials remain in place across updates.
 
 ## Removing
 
 Remove `/Applications/Autocorrect.app` and `~/Library/Input Methods/Autocorrect.app`.
 
-Provider API keys and preferences are intentionally not deleted automatically. Remove API keys from Autocorrect before deleting the application if you want those credentials removed from Keychain.
+Provider API keys and preferences are intentionally not deleted automatically. Use **Remove Key** in Autocorrect first, or delete `~/Library/Application Support/Autocorrect/credentials.json` if you want locally stored provider credentials removed as well.
 
 ## Gatekeeper
 
