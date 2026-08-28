@@ -37,4 +37,72 @@ jobs:
             -configuration Debug \
             -derivedDataPath .build \
             CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectCoreTests \
+            test
+
+      - name: Test provider presets
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testGeminiPresetUsesGoogleOpenAICompatibilityEndpoint \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testOpenRouterPresetUsesSameOpenAICompatibleShape \
+            test
+
+      - name: Test provider request format
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testRequestUsesBearerKeyAndStructuredBody \
+            test
+
+      - name: Test provider response decoding
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testCorrectionDecodesStructuredResponse \
+            test
+
+      - name: Test provider auth guard
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testMissingAPIKeyFailsBeforeNetworkRequest \
+            test
+
+      - name: Test provider error privacy
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/OpenAICompatibleCorrectionProviderTests/testHTTPFailureDoesNotIncludePromptInError \
+            test
+
+      - name: Test provider context bounds
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/CorrectionRequestTests \
             test
