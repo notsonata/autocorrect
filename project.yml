@@ -21,6 +21,7 @@ schemes:
         AutocorrectSettings: all
         AutocorrectInputMethod: all
         AutocorrectMenuBar: all
+        AutocorrectInstaller: all
     test:
       targets:
         - AutocorrectCoreTests
@@ -102,6 +103,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
         CODE_SIGN_ENTITLEMENTS: Configuration/AutocorrectShared.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+
+  AutocorrectInstaller:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/AutocorrectInstaller
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.installer
+        PRODUCT_NAME: Autocorrect Installer
+        GENERATE_INFOPLIST_FILE: YES
         ENABLE_HARDENED_RUNTIME: YES
 
   AutocorrectCoreTests:
