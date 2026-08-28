@@ -55,6 +55,7 @@ targets:
           - AutocorrectInputMethod-Bridging-Header.h
     dependencies:
       - target: AutocorrectCore
+      - target: AutocorrectProviders
       - sdk: InputMethodKit.framework
       - sdk: Carbon.framework
       - sdk: ApplicationServices.framework

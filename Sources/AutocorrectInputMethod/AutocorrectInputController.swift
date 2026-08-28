@@ -1,10 +1,15 @@
 import AppKit
 import AutocorrectCore
+import AutocorrectProviders
 import InputMethodKit
 
 @objc(AutocorrectInputController)
 final class AutocorrectInputController: IMKInputController {
     private static let insertionPoint = NSRange(location: NSNotFound, length: NSNotFound)
+    private static let correctionProvider: any CorrectionProvider = OpenAICompatibleCorrectionProvider(
+        configuration: ProviderPresets.gemini,
+        credentialStore: KeychainCredentialStore()
+    )
 
     private var activeClientID: ObjectIdentifier?
     private var pendingCorrections = PendingCorrectionLedger()
@@ -43,16 +48,27 @@ final class AutocorrectInputController: IMKInputController {
         let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
         let snapshot = WordSnapshot.capture(from: client)
 
-        // The boundary reaches the client immediately. No correction work blocks typing.
+        // The boundary reaches the client immediately. No spell checking or network work
+        // is allowed to delay normal typing.
         IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
         recordUserMutation(
             replacing: selectionBeforeInsertion,
             withUTF16Length: string.utf16.count
         )
 
-        guard let snapshot,
-              let plan = PrototypeCorrectionEngine.correction(for: snapshot.original),
-              plan.replacement != snapshot.original else {
+        guard let snapshot else {
+            return true
+        }
+
+        let isKnownWord = NSSpellChecker.shared
+            .checkSpelling(of: snapshot.original, startingAt: 0)
+            .location == NSNotFound
+
+        guard CorrectionCandidatePolicy.shouldRequestCorrection(
+            completedWord: snapshot.original,
+            leftContext: snapshot.leftContext,
+            isKnownWord: isKnownWord
+        ) else {
             return true
         }
 
@@ -60,13 +76,38 @@ final class AutocorrectInputController: IMKInputController {
             original: snapshot.original,
             range: snapshot.range
         )
+        let request = CorrectionRequest(
+            completedWord: snapshot.original,
+            leftContext: snapshot.leftContext
+        )
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + plan.delay) { [weak self] in
-            self?.apply(
-                replacement: plan.replacement,
-                correctionID: correctionID,
-                expectedClientID: clientID
-            )
+        Task { [weak self] in
+            do {
+                let response = try await Self.correctionProvider.correct(request)
+                guard let replacement = CorrectionResponsePolicy.validatedReplacement(
+                    original: snapshot.original,
+                    proposed: response.replacement
+                ) else {
+                    DispatchQueue.main.async {
+                        self?.pendingCorrections.cancel(correctionID)
+                    }
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    self?.apply(
+                        replacement: replacement,
+                        correctionID: correctionID,
+                        expectedClientID: clientID
+                    )
+                }
+            } catch {
+                // Provider failures are pass-through. Never log the error here because
+                // provider implementations may evolve and typing data must stay out of logs.
+                DispatchQueue.main.async {
+                    self?.pendingCorrections.cancel(correctionID)
+                }
+            }
         }
 
         return true

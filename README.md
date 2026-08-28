@@ -19,17 +19,13 @@ See [Privacy](docs/PRIVACY.md) and [Architecture](docs/ARCHITECTURE.md).
 
 ## Current implementation
 
-PR #1 proved seamless delayed replacement through InputMethodKit. PR #2 added multiple concurrent correction jobs, range rebasing, stale-edit cancellation, and additional word boundaries.
+PR #1 proved seamless delayed replacement through InputMethodKit. PR #2 added multiple concurrent correction jobs, range rebasing, stale-edit cancellation, and additional word boundaries. PR #3 added the OpenAI-compatible provider layer, Gemini preset, Keychain credential storage, bounded context, and ephemeral networking.
 
-The current deterministic test words are:
+The current runtime path now uses the Gemini provider when a Gemini API key exists in Keychain. Before any request is sent, a local safety policy rejects already-known words, short tokens, URL/email/code/secret-like fragments, acronyms, mixed-case identifiers, and likely mid-sentence proper nouns. Provider output is accepted only when it is a single word-like token, preserves capitalization style, and stays within a conservative edit-distance bound from the original word.
 
-- `wrld` → `world`
-- `shoud` → `should`
-- `tommorow` → `tomorrow`
-- `gagwin` → `gagawin`
-- `pupnta` → `pupunta`
+Provider failures, missing API keys, rejected candidates, rejected responses, stale edits, secure fields, and unverifiable fields all degrade to normal pass-through typing.
 
-PR #3 introduces the provider layer and Gemini-compatible network transport. It does not yet replace the deterministic runtime path; runtime model selection and safety filtering are introduced in later PRs.
+Provider/model selection and API-key entry UI are intentionally deferred to the menu-bar/settings PR.
 
 ## Build and install
 
@@ -47,12 +43,13 @@ Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect
 Test at minimum in TextEdit, Notes, Safari, Chrome, and Discord:
 
 1. Enable the Autocorrect input source.
-2. Type `wrld shoud tommorow gagwin pupnta keep typing here` continuously.
-3. Confirm every boundary appears immediately.
-4. Confirm typing remains responsive while delayed corrections are pending.
-5. Confirm corrections can land out of order without corrupting later text.
-6. Confirm no characters typed after a corrected word are lost or reordered.
-7. Confirm the caret does not visibly jump back to corrected words.
+2. Type continuously while corrections are pending and confirm every boundary appears immediately.
+3. Confirm corrections can land out of order without corrupting later text.
+4. Confirm no characters typed after a corrected word are lost or reordered.
+5. Confirm the caret does not visibly jump back to corrected words.
+6. Confirm correctly spelled common words do not trigger visible mutations.
+7. Confirm URLs, email addresses, hashtags, code-like identifiers, and secret-like tokens remain untouched.
 8. Confirm password and secure fields receive pass-through typing without correction.
+9. Confirm removing the provider API key causes silent pass-through behavior rather than typing interruption.
 
 Development is tracked through pull requests against `main`.
