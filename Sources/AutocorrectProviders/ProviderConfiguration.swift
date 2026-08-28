@@ -29,13 +29,17 @@ public struct OpenAICompatibleProviderConfiguration: Sendable, Equatable {
 }
 
 public enum ProviderPresets {
-    public static let gemini = OpenAICompatibleProviderConfiguration(
-        identifier: "gemini",
-        displayName: "Google Gemini",
-        baseURL: URL(string: "https://generativelanguage.googleapis.com/v1beta/openai/")!,
-        model: "gemini-3.7-flash",
-        reasoningEffort: "low"
-    )
+    public static let gemini = gemini(model: "gemini-3.7-flash")
+
+    public static func gemini(model: String) -> OpenAICompatibleProviderConfiguration {
+        OpenAICompatibleProviderConfiguration(
+            identifier: "gemini",
+            displayName: "Google Gemini",
+            baseURL: URL(string: "https://generativelanguage.googleapis.com/v1beta/openai/")!,
+            model: model,
+            reasoningEffort: "low"
+        )
+    }
 
     public static func openRouter(model: String) -> OpenAICompatibleProviderConfiguration {
         OpenAICompatibleProviderConfiguration(

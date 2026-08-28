@@ -1,15 +1,14 @@
 import AppKit
 import AutocorrectCore
 import AutocorrectProviders
+import AutocorrectSettings
 import InputMethodKit
 
 @objc(AutocorrectInputController)
 final class AutocorrectInputController: IMKInputController {
     private static let insertionPoint = NSRange(location: NSNotFound, length: NSNotFound)
-    private static let correctionProvider: any CorrectionProvider = OpenAICompatibleCorrectionProvider(
-        configuration: ProviderPresets.gemini,
-        credentialStore: KeychainCredentialStore()
-    )
+    private static let settingsCache = RuntimeSettingsCache()
+    private static let credentialStore: ProviderCredentialStore = KeychainCredentialStore()
 
     private var activeClientID: ObjectIdentifier?
     private var pendingCorrections = PendingCorrectionLedger()
@@ -37,6 +36,14 @@ final class AutocorrectInputController: IMKInputController {
             return true
         }
 
+        let runtimeSettings = Self.settingsCache.current
+        guard runtimeAllowsCorrection(runtimeSettings),
+              let providerConfiguration = RuntimeProviderFactory.configuration(from: runtimeSettings) else {
+            pendingCorrections.cancelAll()
+            IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
+            return true
+        }
+
         // A correction boundary is the only point where surrounding text is inspected.
         // Fail closed before reading it if the focused field is secure or unverifiable.
         guard AccessibilityGate.safeFocusedField() != nil else {
@@ -48,8 +55,8 @@ final class AutocorrectInputController: IMKInputController {
         let selectionBeforeInsertion = IMKClientBridge.selectedRange(client: client)
         let snapshot = WordSnapshot.capture(from: client)
 
-        // The boundary reaches the client immediately. No spell checking or network work
-        // is allowed to delay normal typing.
+        // The boundary reaches the client immediately. No spell checking, Keychain lookup,
+        // or network work is allowed to delay normal typing.
         IMKClientBridge.insert(text: string, replacing: Self.insertionPoint, client: client)
         recordUserMutation(
             replacing: selectionBeforeInsertion,
@@ -80,10 +87,15 @@ final class AutocorrectInputController: IMKInputController {
             completedWord: snapshot.original,
             leftContext: snapshot.leftContext
         )
+        let expectedProviderSignature = runtimeSettings.providerConfigurationSignature
+        let correctionProvider = RuntimeProviderFactory.provider(
+            configuration: providerConfiguration,
+            credentialStore: Self.credentialStore
+        )
 
         Task { [weak self] in
             do {
-                let response = try await Self.correctionProvider.correct(request)
+                let response = try await correctionProvider.correct(request)
                 guard let replacement = CorrectionResponsePolicy.validatedReplacement(
                     original: snapshot.original,
                     proposed: response.replacement
@@ -98,7 +110,8 @@ final class AutocorrectInputController: IMKInputController {
                     self?.apply(
                         replacement: replacement,
                         correctionID: correctionID,
-                        expectedClientID: clientID
+                        expectedClientID: clientID,
+                        expectedProviderSignature: expectedProviderSignature
                     )
                 }
             } catch {
@@ -122,9 +135,20 @@ final class AutocorrectInputController: IMKInputController {
         activeClientID = clientID
     }
 
+    private func runtimeAllowsCorrection(_ settings: AutocorrectSettingsSnapshot) -> Bool {
+        guard settings.isEnabled, settings.privacyAcknowledged else {
+            return false
+        }
+
+        guard let bundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+            return true
+        }
+
+        return !settings.excludedBundleIdentifiers.contains(bundleIdentifier)
+    }
+
     private func recordUserMutation(replacing range: NSRange, withUTF16Length newLength: Int) {
         guard range.location != NSNotFound else {
-            // We cannot safely rebase pending jobs around an unknown edit location.
             pendingCorrections.cancelAll()
             return
         }
@@ -137,8 +161,16 @@ final class AutocorrectInputController: IMKInputController {
     private func apply(
         replacement: String,
         correctionID: PendingCorrectionID,
-        expectedClientID: ObjectIdentifier
+        expectedClientID: ObjectIdentifier,
+        expectedProviderSignature: String
     ) {
+        let currentSettings = Self.settingsCache.current
+        guard runtimeAllowsCorrection(currentSettings),
+              currentSettings.providerConfigurationSignature == expectedProviderSignature else {
+            pendingCorrections.cancel(correctionID)
+            return
+        }
+
         guard let currentClient = client() else {
             pendingCorrections.cancel(correctionID)
             return
@@ -164,8 +196,6 @@ final class AutocorrectInputController: IMKInputController {
         }
 
         guard IMKClientBridge.string(range: job.range, client: currentClientObject) == job.original else {
-            // Unknown edits, mouse-driven changes, or another text system may have
-            // touched the document. Never search for a replacement target elsewhere.
             pendingCorrections.cancel(correctionID)
             return
         }
@@ -192,8 +222,6 @@ final class AutocorrectInputController: IMKInputController {
         )
 
         guard fieldAccess.restoreCollapsedSelection(location: rebasedCaret) else {
-            // The ledger is intentionally not committed until cursor restoration
-            // succeeds, so a rollback leaves every outstanding range unchanged.
             let replacementRange = NSRange(
                 location: job.range.location,
                 length: replacement.utf16.count

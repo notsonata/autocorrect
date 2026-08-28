@@ -40,6 +40,17 @@ jobs:
             -only-testing:AutocorrectCoreTests \
             test
 
+      - name: Test settings
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectSettingsTests \
+            test
+
       - name: Test provider presets
         run: |
           xcodebuild \
