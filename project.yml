@@ -15,10 +15,12 @@ schemes:
     build:
       targets:
         AutocorrectCore: all
+        AutocorrectProviders: all
         AutocorrectInputMethod: all
     test:
       targets:
         - AutocorrectCoreTests
+        - AutocorrectProvidersTests
 
 targets:
   AutocorrectCore:
@@ -29,6 +31,18 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.core
+        GENERATE_INFOPLIST_FILE: YES
+
+  AutocorrectProviders:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/AutocorrectProviders
+    dependencies:
+      - sdk: Security.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.providers
         GENERATE_INFOPLIST_FILE: YES
 
   AutocorrectInputMethod:
@@ -60,6 +74,17 @@ targets:
       - Tests/AutocorrectCoreTests
     dependencies:
       - target: AutocorrectCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+  AutocorrectProvidersTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/AutocorrectProvidersTests
+    dependencies:
+      - target: AutocorrectProviders
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
