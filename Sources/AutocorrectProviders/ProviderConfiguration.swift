@@ -22,7 +22,9 @@ public struct OpenAICompatibleProviderConfiguration: Sendable, Equatable {
     }
 
     public var chatCompletionsURL: URL {
-        baseURL.appendingPathComponent("chat/completions")
+        baseURL
+            .appendingPathComponent("chat")
+            .appendingPathComponent("completions")
     }
 }
 
