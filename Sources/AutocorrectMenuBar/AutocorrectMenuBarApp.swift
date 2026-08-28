@@ -9,12 +9,13 @@ struct AutocorrectApp: App {
     var body: some Scene {
         WindowGroup("Autocorrect", id: "settings") {
             SettingsView(model: model)
-                .frame(width: 560, height: 690)
+                .frame(minWidth: 760, minHeight: 520)
                 .onAppear {
                     NSApplication.shared.activate(ignoringOtherApps: true)
                 }
         }
-        .windowResizability(.contentSize)
+        .defaultSize(width: 780, height: 540)
+        .windowResizability(.contentMinSize)
 
         MenuBarExtra {
             MenuContentView(model: model)
