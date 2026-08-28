@@ -10,18 +10,28 @@ public protocol ProviderCredentialStore: Sendable {
 public enum ProviderCredentialStoreError: Error, Equatable {
     case unexpectedStatus(OSStatus)
     case invalidData
+    case unsignedSharingUnavailable
 }
 
 public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked Sendable {
+    private enum StorageMode {
+        case sharedDataProtection(accessGroup: String)
+        case legacyTrustedApplications
+    }
+
     private let service: String
-    private let accessGroup: String?
+    private let storageMode: StorageMode
 
     public init(
         service: String = "dev.notsonata.autocorrect.providers",
         accessGroup: String? = SharedKeychainAccessGroup.current()
     ) {
         self.service = service
-        self.accessGroup = accessGroup
+        if let accessGroup, !accessGroup.isEmpty {
+            self.storageMode = .sharedDataProtection(accessGroup: accessGroup)
+        } else {
+            self.storageMode = .legacyTrustedApplications
+        }
     }
 
     public func apiKey(for providerIdentifier: String) throws -> String? {
@@ -52,12 +62,15 @@ public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked 
         let data = Data(apiKey.utf8)
         let query = baseQuery(providerIdentifier: providerIdentifier)
 
-        let attributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        var updateAttributes: [String: Any] = [
+            kSecValueData as String: data
         ]
 
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if case .sharedDataProtection = storageMode {
+            updateAttributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        }
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
         if updateStatus == errSecSuccess {
             return
         }
@@ -67,7 +80,12 @@ public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked 
         }
 
         var insert = query
-        insert.merge(attributes) { _, new in new }
+        insert.merge(updateAttributes) { _, new in new }
+
+        if case .legacyTrustedApplications = storageMode {
+            insert[kSecAttrAccess as String] = try LegacyKeychainAccess.makeAccess()
+        }
+
         let addStatus = SecItemAdd(insert as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw ProviderCredentialStoreError.unexpectedStatus(addStatus)
@@ -85,11 +103,11 @@ public final class KeychainCredentialStore: ProviderCredentialStore, @unchecked 
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: providerIdentifier,
-            kSecUseDataProtectionKeychain as String: true
+            kSecAttrAccount as String: providerIdentifier
         ]
 
-        if let accessGroup, !accessGroup.isEmpty {
+        if case .sharedDataProtection(let accessGroup) = storageMode {
+            query[kSecUseDataProtectionKeychain as String] = true
             query[kSecAttrAccessGroup as String] = accessGroup
         }
 
