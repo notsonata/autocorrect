@@ -10,7 +10,7 @@ A native macOS autocorrection utility for seamless English, Filipino, and Taglis
 - Typed text is transient and is never intentionally persisted to disk, `UserDefaults`, logs, analytics, or correction history.
 - Secure text fields and password entry are never processed.
 - AI providers are isolated behind an OpenAI-compatible provider interface.
-- Provider API keys are stored only in macOS Keychain.
+- Provider API keys are stored locally for the current macOS user in `~/Library/Application Support/Autocorrect/credentials.json` with owner-only file permissions.
 
 ## Application layout
 
@@ -47,7 +47,7 @@ zsh scripts/package-release.sh --unsigned
 This produces one file:
 
 ```text
-dist/Autocorrect-0.1.1-macOS.zip
+dist/Autocorrect-<version>-macOS.zip
 ```
 
 The ZIP contains only `Autocorrect.app`.

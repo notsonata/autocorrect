@@ -5,6 +5,7 @@ on:
     paths:
       - "Sources/AutocorrectMenuBar/**"
       - "Sources/AutocorrectInputMethod/**"
+      - "Sources/AutocorrectProviders/**"
       - "scripts/package-release.sh"
       - "project.yml"
       - ".github/workflows/startup-smoke.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "Sources/AutocorrectMenuBar/**"
       - "Sources/AutocorrectInputMethod/**"
+      - "Sources/AutocorrectProviders/**"
       - "scripts/package-release.sh"
       - "project.yml"
       - ".github/workflows/startup-smoke.yml"
