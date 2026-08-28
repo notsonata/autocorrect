@@ -16,11 +16,14 @@ schemes:
       targets:
         AutocorrectCore: all
         AutocorrectProviders: all
+        AutocorrectSettings: all
         AutocorrectInputMethod: all
+        AutocorrectMenuBar: all
     test:
       targets:
         - AutocorrectCoreTests
         - AutocorrectProvidersTests
+        - AutocorrectSettingsTests
 
 targets:
   AutocorrectCore:
@@ -45,6 +48,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.providers
         GENERATE_INFOPLIST_FILE: YES
 
+  AutocorrectSettings:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/AutocorrectSettings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.settings.shared
+        GENERATE_INFOPLIST_FILE: YES
+
   AutocorrectInputMethod:
     type: application
     platform: macOS
@@ -56,6 +69,7 @@ targets:
     dependencies:
       - target: AutocorrectCore
       - target: AutocorrectProviders
+      - target: AutocorrectSettings
       - sdk: InputMethodKit.framework
       - sdk: Carbon.framework
       - sdk: ApplicationServices.framework
@@ -66,6 +80,25 @@ targets:
         INFOPLIST_FILE: Sources/AutocorrectInputMethod/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SWIFT_OBJC_BRIDGING_HEADER: Sources/AutocorrectInputMethod/AutocorrectInputMethod-Bridging-Header.h
+        CODE_SIGN_ENTITLEMENTS: Configuration/AutocorrectShared.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+
+  AutocorrectMenuBar:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/AutocorrectMenuBar
+    dependencies:
+      - target: AutocorrectProviders
+      - target: AutocorrectSettings
+      - sdk: ServiceManagement.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.notsonata.autocorrect.settings
+        PRODUCT_NAME: Autocorrect Settings
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        CODE_SIGN_ENTITLEMENTS: Configuration/AutocorrectShared.entitlements
         ENABLE_HARDENED_RUNTIME: YES
 
   AutocorrectCoreTests:
@@ -86,6 +119,17 @@ targets:
       - Tests/AutocorrectProvidersTests
     dependencies:
       - target: AutocorrectProviders
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+  AutocorrectSettingsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/AutocorrectSettingsTests
+    dependencies:
+      - target: AutocorrectSettings
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

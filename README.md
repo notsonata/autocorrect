@@ -10,22 +10,26 @@ A native macOS autocorrection utility designed for seamless English, Filipino, a
 - Typed text is transient and is never intentionally persisted to disk, `UserDefaults`, logs, analytics, or correction history.
 - Secure text fields and password entry are never processed.
 - AI providers are isolated behind a provider interface.
-- Network providers use an OpenAI-compatible Chat Completions transport where possible.
 - Provider API keys are stored only in macOS Keychain.
-
-Google Gemini is the first network target through Google's OpenAI-compatible Gemini endpoint. The same transport is designed to support OpenRouter and custom OpenAI-compatible endpoints by changing the base URL, model, and credential.
-
-See [Privacy](docs/PRIVACY.md) and [Architecture](docs/ARCHITECTURE.md).
 
 ## Current implementation
 
-PR #1 proved seamless delayed replacement through InputMethodKit. PR #2 added multiple concurrent correction jobs, range rebasing, stale-edit cancellation, and additional word boundaries. PR #3 added the OpenAI-compatible provider layer, Gemini preset, Keychain credential storage, bounded context, and ephemeral networking.
+PRs #1-#4 established InputMethodKit replacement, concurrent range rebasing, the OpenAI-compatible provider layer, and conservative live AI safety guards.
 
-The current runtime path now uses the Gemini provider when a Gemini API key exists in Keychain. Before any request is sent, a local safety policy rejects already-known words, short tokens, URL/email/code/secret-like fragments, acronyms, mixed-case identifiers, and likely mid-sentence proper nouns. Provider output is accepted only when it is a single word-like token, preserves capitalization style, and stays within a conservative edit-distance bound from the original word.
+PR #5 adds a native SwiftUI menu-bar companion and shared runtime configuration:
 
-Provider failures, missing API keys, rejected candidates, rejected responses, stale edits, secure fields, and unverifiable fields all degrade to normal pass-through typing.
+- autocorrect defaults off,
+- explicit privacy acknowledgment is required before network correction,
+- Google Gemini, OpenRouter, and custom OpenAI-compatible provider selection,
+- per-provider model configuration,
+- API-key save/remove through macOS Keychain,
+- application exclusion by bundle identifier,
+- launch-at-login control,
+- live cross-process settings refresh without putting configuration reads on the keystroke hot path.
 
-Provider/model selection and API-key entry UI are intentionally deferred to the menu-bar/settings PR.
+Only non-sensitive configuration is stored in the shared preferences domain. Typed text and API keys are never stored there.
+
+See [Privacy](docs/PRIVACY.md) and [Architecture](docs/ARCHITECTURE.md).
 
 ## Build and install
 
@@ -33,23 +37,27 @@ Requires macOS 14+, Xcode, and XcodeGen.
 
 ```sh
 brew install xcodegen
+xcodegen generate
+```
+
+The generated project builds both `Autocorrect` (the input method) and `Autocorrect Settings` (the menu-bar companion). The release packaging/install flow is intentionally deferred to PR #7.
+
+For input-method development you can continue to use:
+
+```sh
 zsh scripts/install-input-method.sh
 ```
 
-Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect as an input source, and grant the installed input method Accessibility permission for secure-field and selection-safety checks. If macOS does not list a newly installed input method immediately, log out and back in once.
+Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect as an input source, and grant the installed input method Accessibility permission for secure-field and selection-safety checks.
 
-## Manual input-method acceptance test
+## Manual acceptance checks
 
-Test at minimum in TextEdit, Notes, Safari, Chrome, and Discord:
-
-1. Enable the Autocorrect input source.
-2. Type continuously while corrections are pending and confirm every boundary appears immediately.
-3. Confirm corrections can land out of order without corrupting later text.
-4. Confirm no characters typed after a corrected word are lost or reordered.
-5. Confirm the caret does not visibly jump back to corrected words.
-6. Confirm correctly spelled common words do not trigger visible mutations.
-7. Confirm URLs, email addresses, hashtags, code-like identifiers, and secret-like tokens remain untouched.
-8. Confirm password and secure fields receive pass-through typing without correction.
-9. Confirm removing the provider API key causes silent pass-through behavior rather than typing interruption.
+1. Open `Autocorrect Settings` and acknowledge the privacy disclosure.
+2. Store a Gemini API key, keep `gemini-3.7-flash`, and enable Autocorrect.
+3. Confirm misspellings correct while continuous typing and cursor position remain uninterrupted.
+4. Disable Autocorrect from the menu bar and confirm subsequent boundaries do not inspect or correct text.
+5. Add an application to Excluded Applications and confirm it receives pass-through typing.
+6. Change provider/model while a request is pending and confirm the stale result is discarded.
+7. Confirm password and secure fields remain pass-through only.
 
 Development is tracked through pull requests against `main`.
