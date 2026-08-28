@@ -14,24 +14,25 @@ A native macOS autocorrection utility designed for seamless English, Filipino, a
 
 ## Current implementation
 
-PRs #1-#4 established InputMethodKit replacement, concurrent range rebasing, the OpenAI-compatible provider layer, and conservative live AI safety guards.
+PRs #1-#5 established InputMethodKit replacement, concurrent range rebasing, provider isolation, conservative live AI safety guards, and the native menu-bar settings companion.
 
-PR #5 adds a native SwiftUI menu-bar companion and shared runtime configuration:
+PR #6 adds deterministic English, Filipino, and Taglish quality gates, conservative protected tokens, response-policy regression coverage, and opt-in live Gemini quality/latency evaluation.
 
-- autocorrect defaults off,
-- explicit privacy acknowledgment is required before network correction,
-- Google Gemini, OpenRouter, and custom OpenAI-compatible provider selection,
-- per-provider model configuration,
-- API-key save/remove through macOS Keychain,
-- application exclusion by bundle identifier,
-- launch-at-login control,
-- live cross-process settings refresh without putting configuration reads on the keystroke hot path.
+The v0.1.0 release work adds:
+
+- a shared signed application/keychain group for the input method and settings companion,
+- source-controlled release versioning,
+- reproducible per-user ZIP packaging,
+- Developer ID signing and Hardened Runtime verification,
+- Apple notarization and stapling hooks,
+- a signed release-candidate compatibility matrix,
+- automated tagged GitHub Release publishing.
 
 Only non-sensitive configuration is stored in the shared preferences domain. Typed text and API keys are never stored there.
 
-See [Privacy](docs/PRIVACY.md) and [Architecture](docs/ARCHITECTURE.md).
+See [Privacy](docs/PRIVACY.md), [Architecture](docs/ARCHITECTURE.md), [Quality](docs/QUALITY.md), [Compatibility](docs/COMPATIBILITY.md), and [Release Process](docs/RELEASE.md).
 
-## Build and install
+## Build
 
 Requires macOS 14+, Xcode, and XcodeGen.
 
@@ -40,15 +41,30 @@ brew install xcodegen
 xcodegen generate
 ```
 
-The generated project builds both `Autocorrect` (the input method) and `Autocorrect Settings` (the menu-bar companion). The release packaging/install flow is intentionally deferred to PR #7.
+The generated project builds both `Autocorrect` (the input method) and `Autocorrect Settings` (the menu-bar companion).
 
-For input-method development you can continue to use:
+For development input-method installation:
 
 ```sh
 zsh scripts/install-input-method.sh
 ```
 
-Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect as an input source, and grant the installed input method Accessibility permission for secure-field and selection-safety checks.
+For a complete unsigned release-layout smoke test:
+
+```sh
+zsh scripts/package-release.sh --unsigned
+```
+
+Unsigned packages are development artifacts only. Published builds are intended to be Developer ID signed and Apple-notarized. See [Release Process](docs/RELEASE.md).
+
+## Install
+
+Release ZIPs install entirely into the current user's home directory and do not require an administrator password:
+
+- `~/Library/Input Methods/Autocorrect.app`
+- `~/Applications/Autocorrect Settings.app`
+
+Use `Install Autocorrect.command` from the extracted release and then enable Autocorrect in **System Settings > Keyboard > Text Input > Edit**. Full instructions are in [INSTALL.md](docs/INSTALL.md).
 
 ## Manual acceptance checks
 
@@ -59,5 +75,6 @@ Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect
 5. Add an application to Excluded Applications and confirm it receives pass-through typing.
 6. Change provider/model while a request is pending and confirm the stale result is discarded.
 7. Confirm password and secure fields remain pass-through only.
+8. For a signed release candidate, complete every required row and the cross-process credential check in [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 Development is tracked through pull requests against `main`.
