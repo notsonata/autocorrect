@@ -86,8 +86,9 @@ fi
 
 INPUT_APP="$PRODUCTS_DIR/Autocorrect.app"
 SETTINGS_APP="$PRODUCTS_DIR/Autocorrect Settings.app"
+INSTALLER_APP="$PRODUCTS_DIR/Autocorrect Installer.app"
 
-for app in "$INPUT_APP" "$SETTINGS_APP"; do
+for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
   if [[ ! -d "$app" ]]; then
     echo "Expected build product is missing: $app" >&2
     exit 1
@@ -95,7 +96,10 @@ for app in "$INPUT_APP" "$SETTINGS_APP"; do
 done
 
 if [[ "$MODE" == "signed" ]]; then
-  zsh scripts/release/verify-signed-release.sh "$INPUT_APP" "$SETTINGS_APP"
+  zsh scripts/release/verify-signed-release.sh \
+    "$INPUT_APP" \
+    "$SETTINGS_APP" \
+    "$INSTALLER_APP"
 fi
 
 if (( NOTARIZE )); then
@@ -104,7 +108,7 @@ if (( NOTARIZE )); then
   rm -rf "$NOTARY_DIR"
   mkdir -p "$NOTARY_DIR"
 
-  for app in "$INPUT_APP" "$SETTINGS_APP"; do
+  for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
     name="$(basename "$app" .app | tr ' ' '-')"
     submission="$NOTARY_DIR/$name.zip"
 
@@ -119,12 +123,10 @@ if (( NOTARIZE )); then
 fi
 
 mkdir -p "$PACKAGE_DIR"
+ditto "$INSTALLER_APP" "$PACKAGE_DIR/Install Autocorrect.app"
 ditto "$INPUT_APP" "$PACKAGE_DIR/Autocorrect.app"
 ditto "$SETTINGS_APP" "$PACKAGE_DIR/Autocorrect Settings.app"
-cp scripts/release/install-user.command "$PACKAGE_DIR/Install Autocorrect.command"
-cp scripts/release/uninstall-user.command "$PACKAGE_DIR/Uninstall Autocorrect.command"
 cp docs/INSTALL.md "$PACKAGE_DIR/README.md"
-chmod +x "$PACKAGE_DIR/Install Autocorrect.command" "$PACKAGE_DIR/Uninstall Autocorrect.command"
 
 ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR" "$ARCHIVE"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
