@@ -9,29 +9,27 @@ A native macOS autocorrection utility designed for seamless English, Filipino, a
 - Completed words are evaluated when a word boundary is typed, beginning with Space.
 - Typed text is transient and is never intentionally persisted to disk, `UserDefaults`, logs, analytics, or correction history.
 - Secure text fields and password entry are never processed.
-- AI providers are isolated behind a provider interface. Google Gemini is the first target, authenticated with OAuth.
+- AI providers are isolated behind a provider interface.
+- Network providers use an OpenAI-compatible Chat Completions transport where possible.
+- Provider API keys are stored only in macOS Keychain.
+
+Google Gemini is the first network target through Google's OpenAI-compatible Gemini endpoint. The same transport is designed to support OpenRouter and custom OpenAI-compatible endpoints by changing the base URL, model, and credential.
 
 See [Privacy](docs/PRIVACY.md) and [Architecture](docs/ARCHITECTURE.md).
 
-## Current proof of concept
+## Current implementation
 
-PR #1 is intentionally offline. It uses InputMethodKit plus a small deterministic typo map to prove the hardest interaction requirement before any AI provider is connected.
+PR #1 proved seamless delayed replacement through InputMethodKit. PR #2 added multiple concurrent correction jobs, range rebasing, stale-edit cancellation, and additional word boundaries.
 
-When you type:
-
-```text
-hello wrld keep typing
-```
-
-pressing Space after `wrld` must insert the Space immediately. About 0.8 seconds later, `wrld` changes to `world` while whatever you have typed since remains intact and the live insertion point stays where you are typing.
-
-The POC recognizes these deterministic test words:
+The current deterministic test words are:
 
 - `wrld` → `world`
 - `shoud` → `should`
 - `tommorow` → `tomorrow`
 - `gagwin` → `gagawin`
 - `pupnta` → `pupunta`
+
+PR #3 introduces the provider layer and Gemini-compatible network transport. It does not yet replace the deterministic runtime path; runtime model selection and safety filtering are introduced in later PRs.
 
 ## Build and install
 
@@ -42,19 +40,19 @@ brew install xcodegen
 zsh scripts/install-input-method.sh
 ```
 
-Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect as an input source, and grant the installed input method Accessibility permission for the POC's secure-field and selection-safety checks. If macOS does not list a newly installed input method immediately, log out and back in once.
+Then open **System Settings > Keyboard > Text Input > Edit**, enable Autocorrect as an input source, and grant the installed input method Accessibility permission for secure-field and selection-safety checks. If macOS does not list a newly installed input method immediately, log out and back in once.
 
-## Manual POC acceptance test
+## Manual input-method acceptance test
 
 Test at minimum in TextEdit, Notes, Safari, Chrome, and Discord:
 
 1. Enable the Autocorrect input source.
-2. Type `hello wrld this keeps moving` without pausing after `wrld`.
-3. Confirm the Space after `wrld` appears immediately.
-4. Confirm typing remains responsive while the delayed correction is pending.
-5. Confirm `wrld` becomes `world` behind the live caret.
-6. Confirm no characters typed after `wrld` are lost or reordered.
-7. Confirm the caret does not visibly jump back to the corrected word.
+2. Type `wrld shoud tommorow gagwin pupnta keep typing here` continuously.
+3. Confirm every boundary appears immediately.
+4. Confirm typing remains responsive while delayed corrections are pending.
+5. Confirm corrections can land out of order without corrupting later text.
+6. Confirm no characters typed after a corrected word are lost or reordered.
+7. Confirm the caret does not visibly jump back to corrected words.
 8. Confirm password and secure fields receive pass-through typing without correction.
 
 Development is tracked through pull requests against `main`.
