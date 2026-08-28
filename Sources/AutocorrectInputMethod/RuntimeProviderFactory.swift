@@ -22,9 +22,7 @@ struct RuntimeProviderFactory {
             let baseURLString = settings.customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !model.isEmpty,
                   let baseURL = URL(string: baseURLString),
-                  let scheme = baseURL.scheme?.lowercased(),
-                  scheme == "https" || scheme == "http",
-                  baseURL.host != nil else {
+                  OpenAICompatibleEndpointPolicy.allows(baseURL: baseURL) else {
                 return nil
             }
 
