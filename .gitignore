@@ -1,5 +1,7 @@
 .DS_Store
 .build/
+.release-build/
+dist/
 DerivedData/
 Autocorrect.xcodeproj/
 xcuserdata/
