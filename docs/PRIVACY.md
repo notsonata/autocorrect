@@ -11,10 +11,12 @@ Autocorrect must be treated as keylogger-class software from a threat-model pers
 5. **Minimal context.** Network correction requests are type-bounded to at most the most recent 256 characters of preceding context plus the completed word.
 6. **Ephemeral jobs.** Correction jobs live only in process memory and are released immediately after completion, cancellation, invalidation, or client change.
 7. **No clipboard capture.** Clipboard contents are outside the correction pipeline.
+8. **Local rejection before network use.** Known words and URL/email/code/secret-like candidates are rejected before a provider request is created.
+9. **Untrusted provider output.** Remote output cannot mutate text until a local response policy verifies token shape, capitalization, and conservative edit distance.
 
 ## Current input behavior
 
-On a supported word boundary the input method reads only enough preceding text to identify the completed word, inserts the boundary immediately, and retains only pending correction state required to safely target that word.
+On a supported word boundary the input method reads only enough preceding text to identify the completed word and bounded context, inserts the boundary immediately, and retains only pending correction state required to safely target that word.
 
 Multiple pending words may exist concurrently. Each live input job retains only the original word, an opaque identifier, and its rebased document range. Completed, stale, overlapping, unsafe, or client-switched jobs are immediately removed from the in-memory ledger.
 
@@ -35,9 +37,9 @@ These checks are defense in depth. Secure or unknown fields receive normal pass-
 
 ## Network correction
 
-PR #3 introduces the network provider transport but does not yet make it the live default correction path.
+The live runtime path uses the Gemini provider only after local candidate filtering. Candidates are rejected before network access when they are already known to macOS spelling or resemble short tokens, acronyms, mixed-case identifiers, likely proper nouns, URLs, email addresses, domains, mentions, hashtags, paths, code fragments, or common credential shapes.
 
-When enabled in a later PR, only the selected provider receives the bounded correction request. The provider client:
+For candidates that survive, only the selected provider receives the bounded correction request. The provider client:
 
 - uses an ephemeral `URLSession`,
 - disables URL caching,
@@ -46,7 +48,9 @@ When enabled in a later PR, only the selected provider receives the bounded corr
 - does not log prompts or responses,
 - does not include prompt text in public error values.
 
-Remote providers necessarily receive the bounded context required to perform the requested correction. The settings UI must disclose the selected provider before network correction is enabled.
+Remote providers necessarily receive the bounded context required to perform the requested correction. The settings UI will disclose the selected provider before broader end-user configuration is enabled.
+
+Provider output is not trusted. The input method rejects outputs containing whitespace or multiple tokens, outputs that change capitalization style, and outputs whose edit distance is too large to be treated as a conservative spelling correction. This is a local structural defense against translation and general rewriting.
 
 ## Authentication data
 

@@ -1,8 +1,12 @@
 import Foundation
 
 struct WordSnapshot {
+    private static let maximumWordProbeCharacters = 128
+    private static let maximumLeftContextCharacters = 256
+
     let original: String
     let range: NSRange
+    let leftContext: String
 
     static func capture(from client: AnyObject) -> WordSnapshot? {
         let selection = IMKClientBridge.selectedRange(client: client)
@@ -12,7 +16,10 @@ struct WordSnapshot {
             return nil
         }
 
-        let probeLength = min(selection.location, 128)
+        let probeLength = min(
+            selection.location,
+            maximumWordProbeCharacters + maximumLeftContextCharacters
+        )
         let probeRange = NSRange(
             location: selection.location - probeLength,
             length: probeLength
@@ -30,12 +37,18 @@ struct WordSnapshot {
         }
 
         let original = text.substring(with: match.range)
+        let precedingProbe = text.substring(to: match.range.location)
+        let leftContext = String(precedingProbe.suffix(maximumLeftContextCharacters))
         let documentRange = NSRange(
             location: probeRange.location + match.range.location,
             length: match.range.length
         )
 
-        return WordSnapshot(original: original, range: documentRange)
+        return WordSnapshot(
+            original: original,
+            range: documentRange,
+            leftContext: leftContext
+        )
     }
 
     private static let wordRegex = try! NSRegularExpression(
