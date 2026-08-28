@@ -5,6 +5,12 @@ import Carbon
 struct FocusedFieldAccess {
     let element: AXUIElement
 
+    /// Proves that the focused field accepts selection writes before any text is mutated.
+    /// This intentionally writes the existing collapsed selection back to itself.
+    func preflightCollapsedSelection(location: Int) -> Bool {
+        restoreCollapsedSelection(location: location)
+    }
+
     func restoreCollapsedSelection(location: Int) -> Bool {
         var range = CFRange(location: location, length: 0)
         guard let value = AXValueCreate(.cfRange, &range) else {
