@@ -54,7 +54,25 @@ final class PendingCorrectionLedgerTests: XCTestCase {
         XCTAssertEqual(job.range, NSRange(location: 12, length: 4))
     }
 
-    func testInsertionAtEndOfPendingWordDoesNotShiftTarget() throws {
+    func testInsertionAfterPendingWordLeavesItsRangeUnchanged() throws {
+        var ledger = PendingCorrectionLedger()
+        let id = ledger.register(
+            original: "wrld",
+            range: NSRange(location: 10, length: 4)
+        )
+
+        ledger.recordMutation(
+            TextMutation(
+                range: NSRange(location: 15, length: 0),
+                replacementUTF16Length: 1
+            )
+        )
+
+        let job = try XCTUnwrap(ledger.job(for: id))
+        XCTAssertEqual(job.range, NSRange(location: 10, length: 4))
+    }
+
+    func testInsertionAtPendingWordEdgeCancelsCorrection() {
         var ledger = PendingCorrectionLedger()
         let id = ledger.register(
             original: "wrld",
@@ -68,8 +86,7 @@ final class PendingCorrectionLedgerTests: XCTestCase {
             )
         )
 
-        let job = try XCTUnwrap(ledger.job(for: id))
-        XCTAssertEqual(job.range, NSRange(location: 10, length: 4))
+        XCTAssertNil(ledger.job(for: id))
     }
 
     func testOverlappingUserEditCancelsPendingCorrection() {
