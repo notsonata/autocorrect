@@ -11,6 +11,8 @@ final class SettingsViewModel: ObservableObject {
     private let credentialStore: ProviderCredentialStore
     private let inputMethodInstaller: InputMethodInstaller
 
+    let credentialStorageDescription = "~/Library/Application Support/Autocorrect/credentials.json"
+
     @Published var isEnabled: Bool {
         didSet { settings.isEnabled = isEnabled }
     }
@@ -59,7 +61,7 @@ final class SettingsViewModel: ObservableObject {
 
     init(
         settings: SharedAutocorrectSettings = SharedAutocorrectSettings(),
-        credentialStore: ProviderCredentialStore = KeychainCredentialStore(),
+        credentialStore: ProviderCredentialStore = LocalCredentialStore(),
         inputMethodInstaller: InputMethodInstaller = InputMethodInstaller()
     ) {
         self.settings = settings
@@ -81,12 +83,22 @@ final class SettingsViewModel: ObservableObject {
         refreshCredentialStatus()
     }
 
+    var enablementHint: String? {
+        if !inputMethodInstalled {
+            return "Install the input method before enabling Autocorrect."
+        }
+        if !privacyAcknowledged {
+            return "Review and accept the privacy setting before enabling Autocorrect."
+        }
+        return nil
+    }
+
     func installInputMethodIfNeeded() {
         do {
             let changed = try inputMethodInstaller.installIfNeeded()
             inputMethodInstalled = true
             inputMethodMessage = changed
-                ? "Input method installed. Enable Autocorrect in System Settings > Keyboard > Text Input > Edit."
+                ? "Input method installed. Add Autocorrect in Keyboard Settings, then select it as an input source."
                 : "Input method is installed."
         } catch {
             inputMethodInstalled = inputMethodInstaller.isInstalled()
@@ -101,7 +113,7 @@ final class SettingsViewModel: ObservableObject {
         do {
             try inputMethodInstaller.reinstall()
             inputMethodInstalled = true
-            inputMethodMessage = "Input method reinstalled. Enable Autocorrect in System Settings > Keyboard > Text Input > Edit."
+            inputMethodMessage = "Input method reinstalled. Add Autocorrect in Keyboard Settings if it is not already enabled."
         } catch {
             inputMethodInstalled = inputMethodInstaller.isInstalled()
             inputMethodMessage = "Could not reinstall the input method: \(error.localizedDescription)"
@@ -123,9 +135,9 @@ final class SettingsViewModel: ObservableObject {
             try credentialStore.setAPIKey(value, for: selectedProvider.rawValue)
             pendingAPIKey = ""
             hasStoredAPIKey = true
-            credentialMessage = "API key stored in macOS Keychain."
+            credentialMessage = "API key saved locally."
         } catch {
-            credentialMessage = "Could not store the API key in Keychain."
+            credentialMessage = "Could not save the API key locally."
         }
     }
 
@@ -136,7 +148,7 @@ final class SettingsViewModel: ObservableObject {
             hasStoredAPIKey = false
             credentialMessage = "API key removed."
         } catch {
-            credentialMessage = "Could not remove the API key from Keychain."
+            credentialMessage = "Could not remove the local API key."
         }
     }
 
@@ -147,7 +159,7 @@ final class SettingsViewModel: ObservableObject {
             credentialMessage = nil
         } catch {
             hasStoredAPIKey = false
-            credentialMessage = "Could not read Keychain status."
+            credentialMessage = "Could not read the local API key file."
         }
     }
 
