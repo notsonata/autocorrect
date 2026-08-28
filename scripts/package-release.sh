@@ -100,6 +100,15 @@ if [[ "$MODE" == "signed" ]]; then
     "$INPUT_APP" \
     "$SETTINGS_APP" \
     "$INSTALLER_APP"
+else
+  # A free community build has no Developer ID identity. Ad-hoc signing still
+  # gives each bundle a valid local code signature for macOS runtime/TCC and
+  # legacy Keychain trusted-application checks. It does not satisfy Gatekeeper
+  # as an identified developer and does not require an Apple Developer account.
+  for app in "$INPUT_APP" "$SETTINGS_APP" "$INSTALLER_APP"; do
+    codesign --force --deep --sign - --options runtime "$app"
+    codesign --verify --deep --strict --verbose=2 "$app"
+  done
 fi
 
 if (( NOTARIZE )); then
