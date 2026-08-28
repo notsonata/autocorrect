@@ -11,7 +11,7 @@ struct AutocorrectApp: App {
             SettingsView(model: model)
                 .frame(minWidth: 760, minHeight: 520)
                 .onAppear {
-                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    showSettingsApplicationState()
                 }
         }
         .defaultSize(width: 780, height: 540)
@@ -28,6 +28,11 @@ struct AutocorrectApp: App {
             )
         }
         .menuBarExtraStyle(.menu)
+    }
+
+    private func showSettingsApplicationState() {
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 }
 
@@ -50,6 +55,7 @@ private struct MenuContentView: View {
         Divider()
 
         Button("Settings…") {
+            NSApplication.shared.setActivationPolicy(.regular)
             NSApplication.shared.activate(ignoringOtherApps: true)
             openWindow(id: "settings")
         }
