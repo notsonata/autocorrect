@@ -106,9 +106,15 @@ struct SettingsView: View {
             SettingsCard {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 10) {
-                        Image(systemName: model.inputMethodInstalled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(model.inputMethodInstalled ? .green : .orange)
-                            .font(.title3)
+                        if model.inputMethodInstalled {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.title3)
+                        } else {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.title3)
+                        }
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Input Method")
@@ -213,8 +219,13 @@ struct SettingsView: View {
 
                         Spacer()
 
-                        Image(systemName: model.hasStoredAPIKey ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(model.hasStoredAPIKey ? .green : .secondary)
+                        if model.hasStoredAPIKey {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     HStack(spacing: 10) {
@@ -370,7 +381,11 @@ private struct SettingsHeader: View {
 }
 
 private struct SettingsCard<Content: View>: View {
-    @ViewBuilder let content: Content
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
 
     var body: some View {
         content
