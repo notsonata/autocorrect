@@ -149,7 +149,18 @@ jobs:
             -only-testing:AutocorrectProvidersTests/CorrectionRequestTests \
             test
 
-      - name: Test keychain sharing paths
+      - name: Test local credential storage
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectProvidersTests/LocalCredentialStoreTests \
+            test
+
+      - name: Test legacy Keychain helpers
         run: |
           xcodebuild \
             -project Autocorrect.xcodeproj \
