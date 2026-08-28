@@ -20,11 +20,7 @@ final class QualityRegressionTests: XCTestCase {
 
     func testCandidatePolicyRegressionCorpus() throws {
         for testCase in try loadCorpus().candidateCases {
-            let actual = CorrectionCandidatePolicy.shouldRequestCorrection(
-                completedWord: testCase.input,
-                leftContext: testCase.leftContext,
-                isKnownWord: testCase.isKnownWord
-            )
+            let actual = candidateDecision(testCase)
 
             XCTAssertEqual(
                 actual,
@@ -32,6 +28,34 @@ final class QualityRegressionTests: XCTestCase {
                 "Candidate policy mismatch for \(testCase.id): \(testCase.input)"
             )
         }
+    }
+
+    func testCandidatePolicyQualityMetrics() throws {
+        let cases = try loadCorpus().candidateCases
+        let typoCases = cases.filter { $0.shouldRequest }
+        let preservationCases = cases.filter { !$0.shouldRequest && $0.language != "safety" }
+        let safetyCases = cases.filter { $0.language == "safety" }
+
+        let admittedTypos = typoCases.filter { candidateDecision($0) }.count
+        let falsePositiveRequests = preservationCases.filter { candidateDecision($0) }.count
+        let safetyLeaks = safetyCases.filter { candidateDecision($0) }.count
+
+        let typoAdmissionRate = ratio(admittedTypos, typoCases.count)
+        let falsePositiveRate = ratio(falsePositiveRequests, preservationCases.count)
+
+        print(
+            String(
+                format: "LOCAL QUALITY typo-admission=%.1f%% false-positive=%.1f%% safety-leaks=%d/%d",
+                typoAdmissionRate * 100,
+                falsePositiveRate * 100,
+                safetyLeaks,
+                safetyCases.count
+            )
+        )
+
+        XCTAssertGreaterThanOrEqual(typoAdmissionRate, 0.95)
+        XCTAssertLessThanOrEqual(falsePositiveRate, 0.02)
+        XCTAssertEqual(safetyLeaks, 0)
     }
 
     func testResponsePolicyRegressionCorpus() throws {
@@ -63,11 +87,7 @@ final class QualityRegressionTests: XCTestCase {
         measure(metrics: [XCTClockMetric()]) {
             for _ in 0..<500 {
                 for testCase in cases {
-                    _ = CorrectionCandidatePolicy.shouldRequestCorrection(
-                        completedWord: testCase.input,
-                        leftContext: testCase.leftContext,
-                        isKnownWord: testCase.isKnownWord
-                    )
+                    _ = candidateDecision(testCase)
                 }
             }
         }
@@ -148,6 +168,14 @@ final class QualityRegressionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(correctionAccuracy, 0.80)
         XCTAssertGreaterThanOrEqual(preservationAccuracy, 0.90)
         XCTAssertLessThanOrEqual(p95, 3_500.0)
+    }
+
+    private func candidateDecision(_ testCase: CandidateCase) -> Bool {
+        CorrectionCandidatePolicy.shouldRequestCorrection(
+            completedWord: testCase.input,
+            leftContext: testCase.leftContext,
+            isKnownWord: testCase.isKnownWord
+        )
     }
 
     private func loadCorpus() throws -> QualityCorpus {
