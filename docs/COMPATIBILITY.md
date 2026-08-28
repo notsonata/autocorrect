@@ -18,11 +18,15 @@ A row passes only when normal typing remains immediate, the intended misspelling
 | Terminal | Terminal text input | Add app to exclusions and confirm pass-through typing | Pending manual RC |
 | macOS password field | Secure text field | No surrounding-text inspection or correction | Pending manual RC |
 
+## Installer check
+
+The signed release candidate must be installed from the extracted release using `Install Autocorrect.app`, not from DerivedData. Confirm the installer places the input method and settings companion in their documented per-user locations and can replace an existing installation without requesting administrator privileges.
+
 ## Cross-process credential check
 
 The signed release candidate must also pass this functional Keychain test:
 
-1. Install both packaged apps using `Install Autocorrect.command`.
+1. Install both packaged apps using `Install Autocorrect.app`.
 2. In Autocorrect Settings, save a temporary provider API key.
 3. Enable the Autocorrect input source and correction.
 4. Type a known corpus typo such as `wrld ` in TextEdit.
