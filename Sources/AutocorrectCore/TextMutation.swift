@@ -17,8 +17,8 @@ public struct TextMutation: Equatable, Sendable {
 public enum TextRangeRebaser {
     /// Rebases a target range across a completed mutation.
     ///
-    /// Returns nil when the mutation overlaps the target range, because the caller can
-    /// no longer prove that the target still refers to the same logical text.
+    /// Returns nil when the mutation overlaps or directly touches the target range in
+    /// a way that may represent a user editing the target token itself.
     public static func rebase(_ target: NSRange, across mutation: TextMutation) -> NSRange? {
         guard target.location != NSNotFound,
               mutation.range.location != NSNotFound else {
@@ -31,17 +31,19 @@ public enum TextRangeRebaser {
         let mutationEnd = NSMaxRange(mutation.range)
 
         if mutation.range.length == 0 {
-            if mutationStart <= targetStart {
+            if mutationStart < targetStart {
                 return NSRange(
                     location: targetStart + mutation.delta,
                     length: target.length
                 )
             }
 
-            if mutationStart >= targetEnd {
+            if mutationStart > targetEnd {
                 return target
             }
 
+            // An insertion at either edge or inside the target may be the user
+            // manually editing that token. Discard the pending correction.
             return nil
         }
 
