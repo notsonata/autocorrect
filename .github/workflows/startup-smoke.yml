@@ -1,0 +1,60 @@
+name: Startup Smoke
+
+on:
+  pull_request:
+    paths:
+      - "Sources/AutocorrectMenuBar/**"
+      - "Sources/AutocorrectInputMethod/**"
+      - "project.yml"
+      - ".github/workflows/startup-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Sources/AutocorrectMenuBar/**"
+      - "Sources/AutocorrectInputMethod/**"
+      - "project.yml"
+      - ".github/workflows/startup-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  launch:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build release app
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Release \
+            -derivedDataPath .startup-smoke \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Launch outer app
+        run: |
+          set -euo pipefail
+          APP="$PWD/.startup-smoke/Build/Products/Release/Autocorrect.app"
+          test -d "$APP"
+
+          open "$APP"
+          sleep 5
+
+          if ! pgrep -f "$APP/Contents/MacOS/Autocorrect" >/dev/null; then
+            echo "Autocorrect did not remain running after launch." >&2
+            exit 1
+          fi
+
+          test -d "$HOME/Library/Input Methods/Autocorrect.app"
+
+          pkill -f "$APP/Contents/MacOS/Autocorrect" || true
