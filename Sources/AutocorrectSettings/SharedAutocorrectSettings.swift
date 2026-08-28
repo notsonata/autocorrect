@@ -1,9 +1,9 @@
 import Foundation
 
 public enum CorrectionProviderSelection: String, CaseIterable, Identifiable, Sendable {
-    case gemini
-    case openRouter
-    case custom
+    case gemini = "gemini"
+    case openRouter = "openrouter"
+    case custom = "custom"
 
     public var id: String { rawValue }
 
@@ -161,8 +161,7 @@ public final class SharedAutocorrectSettings: @unchecked Sendable {
         DistributedNotificationCenter.default().post(
             name: Self.didChangeNotification,
             object: nil,
-            userInfo: nil,
-            deliverImmediately: true
+            userInfo: nil
         )
     }
 }
