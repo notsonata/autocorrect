@@ -2,11 +2,6 @@ import XCTest
 @testable import AutocorrectProviders
 
 final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
-    override func tearDown() {
-        MockURLProtocol.requestHandler = nil
-        super.tearDown()
-    }
-
     func testGeminiPresetUsesGoogleOpenAICompatibilityEndpoint() {
         XCTAssertEqual(
             ProviderPresets.gemini.chatCompletionsURL.absoluteString,
@@ -28,8 +23,7 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
     func testRequestUsesBearerKeyAndStructuredBody() throws {
         let provider = OpenAICompatibleCorrectionProvider(
             configuration: ProviderPresets.gemini,
-            credentialStore: InMemoryCredentialStore(values: ["gemini": "test-key"]),
-            session: makeMockSession()
+            credentialStore: InMemoryCredentialStore(values: ["gemini": "test-key"])
         )
 
         let request = try provider.makeURLRequest(
@@ -62,9 +56,9 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
 
     func testCorrectionDecodesStructuredResponse() async throws {
         let credentialStore = InMemoryCredentialStore(values: ["gemini": "test-key"])
-        let session = makeMockSession()
+        let transport = MockHTTPTransport { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
 
-        MockURLProtocol.requestHandler = { request in
             let responseJSON = """
             {
               "choices": [
@@ -73,24 +67,18 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
             }
             """
             let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url),
+                url: request.url!,
                 statusCode: 200,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (response, Data(responseJSON.utf8))
+            return (Data(responseJSON.utf8), response)
         }
 
         let provider = OpenAICompatibleCorrectionProvider(
-            configuration: .init(
-                identifier: ProviderPresets.gemini.identifier,
-                displayName: ProviderPresets.gemini.displayName,
-                baseURL: testBaseURL,
-                model: ProviderPresets.gemini.model,
-                reasoningEffort: ProviderPresets.gemini.reasoningEffort
-            ),
+            configuration: ProviderPresets.gemini,
             credentialStore: credentialStore,
-            session: session
+            transport: transport
         )
 
         let result = try await provider.correct(
@@ -101,10 +89,14 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
 
     func testMissingAPIKeyFailsBeforeNetworkRequest() async {
         let credentialStore = InMemoryCredentialStore(values: [:])
+        let transport = MockHTTPTransport { _ in
+            XCTFail("Transport must not be called without a configured API key")
+            throw URLError(.userAuthenticationRequired)
+        }
         let provider = OpenAICompatibleCorrectionProvider(
             configuration: ProviderPresets.gemini,
             credentialStore: credentialStore,
-            session: makeMockSession()
+            transport: transport
         )
 
         do {
@@ -121,28 +113,20 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
 
     func testHTTPFailureDoesNotIncludePromptInError() async {
         let credentialStore = InMemoryCredentialStore(values: ["gemini": "test-key"])
-        let session = makeMockSession()
-
-        MockURLProtocol.requestHandler = { request in
+        let transport = MockHTTPTransport { request in
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 429,
                 httpVersion: nil,
                 headerFields: nil
             )!
-            return (response, Data("rate limited".utf8))
+            return (Data("rate limited".utf8), response)
         }
 
         let provider = OpenAICompatibleCorrectionProvider(
-            configuration: .init(
-                identifier: "gemini",
-                displayName: "Gemini",
-                baseURL: testBaseURL,
-                model: "gemini-3.7-flash",
-                reasoningEffort: "low"
-            ),
+            configuration: ProviderPresets.gemini,
             credentialStore: credentialStore,
-            session: session
+            transport: transport
         )
 
         do {
@@ -157,18 +141,6 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
-    }
-
-    private var testBaseURL: URL {
-        URL(string: "https://example.invalid/v1/")!
-    }
-
-    private func makeMockSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
-        configuration.urlCache = nil
-        configuration.httpShouldSetCookies = false
-        return URLSession(configuration: configuration)
     }
 }
 
@@ -192,27 +164,14 @@ private final class InMemoryCredentialStore: ProviderCredentialStore, @unchecked
     }
 }
 
-private final class MockURLProtocol: URLProtocol {
-    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+private struct MockHTTPTransport: HTTPTransport {
+    let handler: @Sendable (URLRequest) throws -> (Data, URLResponse)
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-
-    override func startLoading() {
-        guard let handler = Self.requestHandler else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
-            return
-        }
-
-        do {
-            let (response, data) = try handler(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
+    init(handler: @escaping @Sendable (URLRequest) throws -> (Data, URLResponse)) {
+        self.handler = handler
     }
 
-    override func stopLoading() {}
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        try handler(request)
+    }
 }
