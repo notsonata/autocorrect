@@ -38,6 +38,7 @@ targets:
       - path: Sources/AutocorrectInputMethod
         excludes:
           - Info.plist
+          - AutocorrectInputMethod-Bridging-Header.h
     dependencies:
       - target: AutocorrectCore
       - sdk: InputMethodKit.framework
@@ -49,6 +50,7 @@ targets:
         PRODUCT_NAME: Autocorrect
         INFOPLIST_FILE: Sources/AutocorrectInputMethod/Info.plist
         GENERATE_INFOPLIST_FILE: NO
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/AutocorrectInputMethod/AutocorrectInputMethod-Bridging-Header.h
         ENABLE_HARDENED_RUNTIME: YES
 
   AutocorrectCoreTests:
