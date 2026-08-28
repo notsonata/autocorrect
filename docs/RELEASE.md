@@ -1,6 +1,6 @@
 # Release Process
 
-v0.1.0 is distributed as a per-user macOS ZIP containing the input method, the menu-bar settings companion, an installer, an uninstaller, and installation notes.
+v0.1.0 is distributed as a per-user macOS ZIP containing three app bundles: the input method, the menu-bar settings companion, and a native installer with Install and Uninstall controls. Installation notes are included alongside them.
 
 ## Local unsigned package
 
@@ -33,7 +33,16 @@ AUTOCORRECT_NOTARY_PROFILE="autocorrect-notary" \
 zsh scripts/package-release.sh --notarize
 ```
 
-The packaging script verifies both app signatures, requires the Hardened Runtime, verifies that both apps carry the same team-prefixed shared application/keychain group, submits each app to Apple notarization, staples the resulting tickets, asks Gatekeeper to assess the stapled apps, then creates the final ZIP and checksum.
+The packaging script verifies all three app signatures and requires the Hardened Runtime. It also verifies that the input method and settings companion carry the same team-prefixed shared application/keychain group. It then submits all three apps to Apple notarization, staples the resulting tickets, asks Gatekeeper to assess the stapled apps, and creates the final ZIP and checksum.
+
+The final ZIP contains:
+
+- `Install Autocorrect.app`
+- `Autocorrect.app`
+- `Autocorrect Settings.app`
+- `README.md`
+
+The installer copies only into per-user locations and does not require administrator privileges.
 
 ## GitHub Actions secrets
 
@@ -52,9 +61,9 @@ No signing certificate, private key, Apple ID password, API key, or notarization
 Before creating the tag:
 
 1. Build a signed and notarized candidate with `scripts/package-release.sh --notarize`.
-2. Install it from the generated ZIP, not from DerivedData.
+2. Extract the generated ZIP and install it through `Install Autocorrect.app`, not from DerivedData.
 3. Complete every required row in `docs/COMPATIBILITY.md` on the actual packaged build.
-4. Complete the cross-process credential check in `docs/COMPATIBILITY.md`.
+4. Complete the installer and cross-process credential checks in `docs/COMPATIBILITY.md`.
 5. Confirm the input method remains pass-through in secure text fields.
 6. Confirm the GitHub `Build` workflow is green on the release commit.
 7. Confirm `git diff` is clean and the release commit is the intended commit.
@@ -70,6 +79,6 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The `Release` workflow imports the Developer ID certificate into an ephemeral runner Keychain, configures `notarytool`, rebuilds the apps from the tagged commit, signs and notarizes them, generates the ZIP and SHA-256 file, then creates the GitHub Release.
+The `Release` workflow imports the Developer ID certificate into an ephemeral runner Keychain, configures `notarytool`, rebuilds the apps from the tagged commit, signs and notarizes all three app bundles, generates the ZIP and SHA-256 file, then creates the GitHub Release.
 
 The release script rejects a tag version that does not match `MARKETING_VERSION` in `project.yml`.
