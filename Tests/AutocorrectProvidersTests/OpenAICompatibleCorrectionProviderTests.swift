@@ -25,31 +25,46 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
         XCTAssertEqual(preset.model, "google/gemini-3.7-flash")
     }
 
-    func testCorrectionUsesBearerKeyAndStructuredResponse() async throws {
+    func testRequestUsesBearerKeyAndStructuredBody() throws {
+        let provider = OpenAICompatibleCorrectionProvider(
+            configuration: ProviderPresets.gemini,
+            credentialStore: InMemoryCredentialStore(values: ["gemini": "test-key"]),
+            session: makeMockSession()
+        )
+
+        let request = try provider.makeURLRequest(
+            for: CorrectionRequest(completedWord: "gagwin", leftContext: "ano ang "),
+            apiKey: "test-key"
+        )
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertEqual(request.url, ProviderPresets.gemini.chatCompletionsURL)
+
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        XCTAssertEqual(json["model"] as? String, "gemini-3.7-flash")
+        XCTAssertEqual(json["reasoning_effort"] as? String, "low")
+
+        let responseFormat = try XCTUnwrap(json["response_format"] as? [String: Any])
+        XCTAssertEqual(responseFormat["type"] as? String, "json_schema")
+
+        let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.count, 2)
+        let userContent = try XCTUnwrap(messages.last?["content"] as? String)
+        XCTAssertTrue(userContent.contains("gagwin"))
+        XCTAssertTrue(userContent.contains("ano ang"))
+    }
+
+    func testCorrectionDecodesStructuredResponse() async throws {
         let credentialStore = InMemoryCredentialStore(values: ["gemini": "test-key"])
         let session = makeMockSession()
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
-            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
-
-            let body = try requestBodyData(request)
-            let json = try XCTUnwrap(
-                JSONSerialization.jsonObject(with: body) as? [String: Any]
-            )
-            XCTAssertEqual(json["model"] as? String, "gemini-3.7-flash")
-            XCTAssertEqual(json["reasoning_effort"] as? String, "low")
-
-            let responseFormat = try XCTUnwrap(json["response_format"] as? [String: Any])
-            XCTAssertEqual(responseFormat["type"] as? String, "json_schema")
-
-            let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
-            XCTAssertEqual(messages.count, 2)
-            let userContent = try XCTUnwrap(messages.last?["content"] as? String)
-            XCTAssertTrue(userContent.contains("gagwin"))
-            XCTAssertTrue(userContent.contains("ano ang"))
-
             let responseJSON = """
             {
               "choices": [
@@ -155,41 +170,6 @@ final class OpenAICompatibleCorrectionProviderTests: XCTestCase {
         configuration.httpShouldSetCookies = false
         return URLSession(configuration: configuration)
     }
-}
-
-private func requestBodyData(_ request: URLRequest) throws -> Data {
-    if let body = request.httpBody {
-        return body
-    }
-
-    guard let stream = request.httpBodyStream else {
-        throw URLError(.zeroByteResource)
-    }
-
-    stream.open()
-    defer { stream.close() }
-
-    var data = Data()
-    var buffer = [UInt8](repeating: 0, count: 4096)
-
-    while true {
-        let readCount = buffer.withUnsafeMutableBufferPointer { pointer in
-            guard let baseAddress = pointer.baseAddress else { return 0 }
-            return stream.read(baseAddress, maxLength: pointer.count)
-        }
-
-        if readCount < 0 {
-            throw stream.streamError ?? URLError(.cannotDecodeContentData)
-        }
-
-        if readCount == 0 {
-            break
-        }
-
-        data.append(contentsOf: buffer.prefix(readCount))
-    }
-
-    return data
 }
 
 private final class InMemoryCredentialStore: ProviderCredentialStore, @unchecked Sendable {
