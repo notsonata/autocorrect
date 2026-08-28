@@ -24,6 +24,7 @@ schemes:
         - AutocorrectCoreTests
         - AutocorrectProvidersTests
         - AutocorrectSettingsTests
+        - AutocorrectQualityTests
 
 targets:
   AutocorrectCore:
@@ -130,6 +131,18 @@ targets:
       - Tests/AutocorrectSettingsTests
     dependencies:
       - target: AutocorrectSettings
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+  AutocorrectQualityTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/AutocorrectQualityTests
+    dependencies:
+      - target: AutocorrectCore
+      - target: AutocorrectProviders
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

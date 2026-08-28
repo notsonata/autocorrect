@@ -40,6 +40,17 @@ jobs:
             -only-testing:AutocorrectCoreTests \
             test
 
+      - name: Test language quality corpus
+        run: |
+          xcodebuild \
+            -project Autocorrect.xcodeproj \
+            -scheme AutocorrectInputMethod \
+            -configuration Debug \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:AutocorrectQualityTests \
+            test
+
       - name: Test settings
         run: |
           xcodebuild \

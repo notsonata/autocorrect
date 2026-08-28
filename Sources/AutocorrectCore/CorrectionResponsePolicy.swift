@@ -65,26 +65,44 @@ public enum CorrectionResponsePolicy {
         ) != nil
     }
 
+    /// Optimal-string-alignment distance. Adjacent transpositions such as
+    /// `teh` -> `the` count as one typo rather than two substitutions.
     private static func editDistance(_ source: [Character], _ target: [Character]) -> Int {
         guard !source.isEmpty else { return target.count }
         guard !target.isEmpty else { return source.count }
 
-        var previous = Array(0...target.count)
+        var matrix = Array(
+            repeating: Array(repeating: 0, count: target.count + 1),
+            count: source.count + 1
+        )
 
-        for (sourceIndex, sourceCharacter) in source.enumerated() {
-            var current = [sourceIndex + 1]
-            current.reserveCapacity(target.count + 1)
-
-            for (targetIndex, targetCharacter) in target.enumerated() {
-                let insertion = current[targetIndex] + 1
-                let deletion = previous[targetIndex + 1] + 1
-                let substitution = previous[targetIndex] + (sourceCharacter == targetCharacter ? 0 : 1)
-                current.append(min(insertion, deletion, substitution))
-            }
-
-            previous = current
+        for sourceIndex in 0...source.count {
+            matrix[sourceIndex][0] = sourceIndex
+        }
+        for targetIndex in 0...target.count {
+            matrix[0][targetIndex] = targetIndex
         }
 
-        return previous[target.count]
+        for sourceIndex in 1...source.count {
+            for targetIndex in 1...target.count {
+                let substitutionCost = source[sourceIndex - 1] == target[targetIndex - 1] ? 0 : 1
+                var distance = min(
+                    matrix[sourceIndex - 1][targetIndex] + 1,
+                    matrix[sourceIndex][targetIndex - 1] + 1,
+                    matrix[sourceIndex - 1][targetIndex - 1] + substitutionCost
+                )
+
+                if sourceIndex > 1,
+                   targetIndex > 1,
+                   source[sourceIndex - 1] == target[targetIndex - 2],
+                   source[sourceIndex - 2] == target[targetIndex - 1] {
+                    distance = min(distance, matrix[sourceIndex - 2][targetIndex - 2] + 1)
+                }
+
+                matrix[sourceIndex][targetIndex] = distance
+            }
+        }
+
+        return matrix[source.count][target.count]
     }
 }

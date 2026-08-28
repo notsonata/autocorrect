@@ -7,6 +7,7 @@ public enum CorrectionCandidatePolicy {
         isKnownWord: Bool
     ) -> Bool {
         guard !isKnownWord,
+              !ProtectedTokenLexicon.contains(completedWord),
               (3...48).contains(completedWord.count),
               isWordLike(completedWord),
               !hasIntentionalCapitalization(completedWord),
