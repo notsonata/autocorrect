@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 concurrency:
   group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -13,6 +16,8 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: macos-15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -153,15 +158,71 @@ jobs:
             -derivedDataPath .build \
             CODE_SIGNING_ALLOWED=NO \
             -only-testing:AutocorrectProvidersTests/SharedKeychainAccessGroupTests \
+            -only-testing:AutocorrectProvidersTests/LegacyKeychainAccessTests \
             test
 
       - name: Build unsigned release package
         run: zsh scripts/package-release.sh --unsigned
 
-      - name: Verify release package layout
+      - name: Read release version
+        id: version
         run: |
-          test -f dist/Autocorrect-0.1.0-macOS.zip
-          test -f dist/Autocorrect-0.1.0-macOS.zip.sha256
-          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Install Autocorrect.app/"
-          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Autocorrect.app/"
-          unzip -l dist/Autocorrect-0.1.0-macOS.zip | grep -F "Autocorrect-0.1.0/Autocorrect Settings.app/"
+          set -euo pipefail
+          VERSION="$(awk -F'\"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release package layout
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -f "dist/Autocorrect-$VERSION-macOS.zip"
+          test -f "dist/Autocorrect-$VERSION-macOS.zip.sha256"
+          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Install Autocorrect.app/"
+          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Autocorrect.app/"
+          unzip -l "dist/Autocorrect-$VERSION-macOS.zip" | grep -F "Autocorrect-$VERSION/Autocorrect Settings.app/"
+
+      - name: Upload unsigned package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Autocorrect-${{ steps.version.outputs.version }}-macOS-unsigned
+          path: |
+            dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip
+            dist/Autocorrect-${{ steps.version.outputs.version }}-macOS.zip.sha256
+          if-no-files-found: error
+
+  publish-community-release:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested community package
+        uses: actions/download-artifact@v4
+        with:
+          name: Autocorrect-${{ needs.build-and-test.outputs.version }}-macOS-unsigned
+          path: dist
+
+      - name: Auto-tag and publish unsigned GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build-and-test.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; leaving it unchanged."
+            exit 0
+          fi
+
+          gh release create "$TAG" \
+            "dist/Autocorrect-$VERSION-macOS.zip" \
+            "dist/Autocorrect-$VERSION-macOS.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "Autocorrect $VERSION" \
+            --notes "Unsigned community build generated automatically from main. No paid Apple Developer account is required. macOS Gatekeeper may require manual approval before first launch."
