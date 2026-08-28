@@ -43,6 +43,9 @@ struct SettingsView: View {
                 case .custom:
                     TextField("Base URL", text: $model.customBaseURL)
                     TextField("Model", text: $model.customModel)
+                    Text("Remote providers must use HTTPS. Plain HTTP is allowed only for loopback providers such as localhost or 127.0.0.1.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 HStack {
