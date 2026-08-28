@@ -1,11 +1,21 @@
 import Foundation
 
+protocol HTTPTransport: Sendable {
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: HTTPTransport {
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        try await data(for: request)
+    }
+}
+
 public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unchecked Sendable {
     public let identifier: String
 
     private let configuration: OpenAICompatibleProviderConfiguration
     private let credentialStore: ProviderCredentialStore
-    private let session: URLSession
+    private let transport: any HTTPTransport
 
     public init(
         configuration: OpenAICompatibleProviderConfiguration,
@@ -15,7 +25,18 @@ public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unch
         self.identifier = configuration.identifier
         self.configuration = configuration
         self.credentialStore = credentialStore
-        self.session = session ?? Self.makeEphemeralSession()
+        self.transport = session ?? Self.makeEphemeralSession()
+    }
+
+    init(
+        configuration: OpenAICompatibleProviderConfiguration,
+        credentialStore: ProviderCredentialStore,
+        transport: any HTTPTransport
+    ) {
+        self.identifier = configuration.identifier
+        self.configuration = configuration
+        self.credentialStore = credentialStore
+        self.transport = transport
     }
 
     public func correct(_ request: CorrectionRequest) async throws -> CorrectionResponse {
@@ -25,7 +46,7 @@ public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unch
         }
 
         let urlRequest = try makeURLRequest(for: request, apiKey: apiKey)
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response) = try await transport.send(urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CorrectionProviderError.invalidResponse
         }
@@ -56,8 +77,8 @@ public final class OpenAICompatibleCorrectionProvider: CorrectionProvider, @unch
         return CorrectionResponse(replacement: payload.replacement)
     }
 
-    /// Kept internal so tests can verify the complete wire request before URLSession
-    /// converts its body into a stream. No typed text is logged or persisted here.
+    /// Kept internal so tests can inspect the complete wire request without sending it.
+    /// No typed text is logged or persisted here.
     func makeURLRequest(for request: CorrectionRequest, apiKey: String) throws -> URLRequest {
         var urlRequest = URLRequest(url: configuration.chatCompletionsURL)
         urlRequest.httpMethod = "POST"
