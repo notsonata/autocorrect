@@ -98,11 +98,27 @@ fi
 if [[ "$MODE" == "signed" ]]; then
   zsh scripts/release/verify-signed-release.sh "$APP"
 else
-  # Free community build: ad-hoc sign the embedded input method and then the
-  # outer app. This does not provide Developer ID trust or notarization.
-  codesign --force --deep --sign - --options runtime "$EMBEDDED_INPUT"
-  codesign --force --deep --sign - --options runtime "$APP"
+  # Free community builds use ad-hoc signatures only. Do not opt these bundles
+  # into Hardened Runtime: without a Developer ID team identity, hardened
+  # library validation can reject our own embedded frameworks at launch.
+  # The paid Developer ID path above keeps Hardened Runtime enabled.
+  codesign --force --deep --sign - "$EMBEDDED_INPUT"
+  codesign --force --deep --sign - "$APP"
   codesign --verify --deep --strict --verbose=2 "$APP"
+
+  app_details="$(codesign --display --verbose=4 "$APP" 2>&1)"
+  if printf '%s\n' "$app_details" | grep -Eq '^Runtime Version=|flags=.*runtime'; then
+    echo "Community app unexpectedly has Hardened Runtime enabled." >&2
+    exit 1
+  fi
+
+  while IFS= read -r framework; do
+    framework_details="$(codesign --display --verbose=4 "$framework" 2>&1)"
+    if printf '%s\n' "$framework_details" | grep -Eq '^Runtime Version=|flags=.*runtime'; then
+      echo "Community framework unexpectedly has Hardened Runtime enabled: $framework" >&2
+      exit 1
+    fi
+  done < <(find "$APP/Contents" -type d -name '*.framework' -prune -print)
 fi
 
 if (( NOTARIZE )); then

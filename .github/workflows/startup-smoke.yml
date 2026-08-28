@@ -5,6 +5,7 @@ on:
     paths:
       - "Sources/AutocorrectMenuBar/**"
       - "Sources/AutocorrectInputMethod/**"
+      - "scripts/package-release.sh"
       - "project.yml"
       - ".github/workflows/startup-smoke.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "Sources/AutocorrectMenuBar/**"
       - "Sources/AutocorrectInputMethod/**"
+      - "scripts/package-release.sh"
       - "project.yml"
       - ".github/workflows/startup-smoke.yml"
 
@@ -28,30 +30,37 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate project
-        run: xcodegen generate
+      - name: Build packaged community release
+        run: zsh scripts/package-release.sh --unsigned
 
-      - name: Build release app
-        run: |
-          xcodebuild \
-            -project Autocorrect.xcodeproj \
-            -scheme AutocorrectInputMethod \
-            -configuration Release \
-            -derivedDataPath .startup-smoke \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
-      - name: Launch outer app
+      - name: Launch packaged outer app
         run: |
           set -euo pipefail
-          APP="$PWD/.startup-smoke/Build/Products/Release/Autocorrect.app"
+
+          VERSION="$(awk -F'\"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)"
+          ARCHIVE="$PWD/dist/Autocorrect-$VERSION-macOS.zip"
+          EXTRACTED="$PWD/.startup-smoke/release"
+          APP="$EXTRACTED/Autocorrect.app"
+
+          test -f "$ARCHIVE"
+          rm -rf "$EXTRACTED" "$HOME/Library/Input Methods/Autocorrect.app"
+          mkdir -p "$EXTRACTED"
+          ditto -x -k "$ARCHIVE" "$EXTRACTED"
+
           test -d "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          details="$(codesign --display --verbose=4 "$APP" 2>&1)"
+          if printf '%s\n' "$details" | grep -Eq '^Runtime Version=|flags=.*runtime'; then
+            echo "Packaged community app unexpectedly has Hardened Runtime enabled." >&2
+            exit 1
+          fi
 
           open "$APP"
           sleep 5
 
           if ! pgrep -f "$APP/Contents/MacOS/Autocorrect" >/dev/null; then
-            echo "Autocorrect did not remain running after launch." >&2
+            echo "Packaged Autocorrect did not remain running after launch." >&2
             exit 1
           fi
 
