@@ -1,12 +1,14 @@
 import Foundation
 
 public struct CorrectionRequest: Sendable, Equatable {
+    public static let maximumContextCharacters = 256
+
     public let completedWord: String
     public let leftContext: String
 
     public init(completedWord: String, leftContext: String) {
         self.completedWord = completedWord
-        self.leftContext = leftContext
+        self.leftContext = String(leftContext.suffix(Self.maximumContextCharacters))
     }
 }
 
