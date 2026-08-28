@@ -23,6 +23,7 @@ The v0.1.0 release work adds:
 - a shared signed application/keychain group for the input method and settings companion,
 - source-controlled release versioning,
 - reproducible per-user ZIP packaging,
+- a native signed installer app for install/update/uninstall,
 - Developer ID signing and Hardened Runtime verification,
 - Apple notarization and stapling hooks,
 - a signed release-candidate compatibility matrix,
@@ -41,7 +42,7 @@ brew install xcodegen
 xcodegen generate
 ```
 
-The generated project builds both `Autocorrect` (the input method) and `Autocorrect Settings` (the menu-bar companion).
+The generated project builds `Autocorrect` (the input method), `Autocorrect Settings` (the menu-bar companion), and `Autocorrect Installer` (the release installer).
 
 For development input-method installation:
 
@@ -64,7 +65,7 @@ Release ZIPs install entirely into the current user's home directory and do not 
 - `~/Library/Input Methods/Autocorrect.app`
 - `~/Applications/Autocorrect Settings.app`
 
-Use `Install Autocorrect.command` from the extracted release and then enable Autocorrect in **System Settings > Keyboard > Text Input > Edit**. Full instructions are in [INSTALL.md](docs/INSTALL.md).
+Open `Install Autocorrect.app` from the extracted release, click **Install Autocorrect**, then enable Autocorrect in **System Settings > Keyboard > Text Input > Edit**. Full instructions are in [INSTALL.md](docs/INSTALL.md).
 
 ## Manual acceptance checks
 
@@ -75,6 +76,6 @@ Use `Install Autocorrect.command` from the extracted release and then enable Aut
 5. Add an application to Excluded Applications and confirm it receives pass-through typing.
 6. Change provider/model while a request is pending and confirm the stale result is discarded.
 7. Confirm password and secure fields remain pass-through only.
-8. For a signed release candidate, complete every required row and the cross-process credential check in [COMPATIBILITY.md](docs/COMPATIBILITY.md).
+8. For a signed release candidate, complete every required row plus the installer and cross-process credential checks in [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 Development is tracked through pull requests against `main`.
