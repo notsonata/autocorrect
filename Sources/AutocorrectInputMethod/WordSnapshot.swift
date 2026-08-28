@@ -3,7 +3,6 @@ import Foundation
 struct WordSnapshot {
     let original: String
     let range: NSRange
-    let clientID: ObjectIdentifier
 
     static func capture(from client: AnyObject) -> WordSnapshot? {
         let selection = IMKClientBridge.selectedRange(client: client)
@@ -36,15 +35,7 @@ struct WordSnapshot {
             length: match.range.length
         )
 
-        return WordSnapshot(
-            original: original,
-            range: documentRange,
-            clientID: ObjectIdentifier(client)
-        )
-    }
-
-    func stillMatches(in client: AnyObject) -> Bool {
-        IMKClientBridge.string(range: range, client: client) == original
+        return WordSnapshot(original: original, range: documentRange)
     }
 
     private static let wordRegex = try! NSRegularExpression(

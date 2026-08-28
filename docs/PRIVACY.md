@@ -12,11 +12,13 @@ Autocorrect must be treated as keylogger-class software from a threat-model pers
 6. **Ephemeral jobs.** Correction jobs live only in process memory and are released immediately after completion, cancellation, invalidation, or client change.
 7. **No clipboard capture.** Clipboard contents are outside the correction pipeline.
 
-## PR #1 behavior
+## Current offline behavior
 
-The proof of concept performs no networking. On Space it reads at most 128 UTF-16 code units immediately before the insertion point, extracts only the final completed word, inserts the Space immediately, and retains only that word and its range while a deterministic delayed correction is pending.
+The current proof of concept performs no networking. On a supported word boundary it reads at most 128 UTF-16 code units immediately before the insertion point, extracts only the final completed word, inserts the boundary immediately, and retains only words that have a known deterministic prototype correction.
 
-Normal character input is passed directly to the client and is not accumulated in a keystroke buffer.
+Multiple pending words may exist concurrently. Each job retains only the original word, an opaque identifier, and its rebased document range. Completed, stale, overlapping, unsafe, or client-switched jobs are immediately removed from the in-memory ledger.
+
+Ordinary non-boundary input is passed directly to the client and is not accumulated in a keystroke buffer. Its text is not inspected by the correction engine. Only its selection range and replacement length are used transiently to keep pending ranges anchored.
 
 ## Secure-input checks
 
@@ -26,6 +28,8 @@ The proof of concept rejects correction when either of these checks indicates a 
 - The focused Accessibility element has the `AXSecureTextField` subrole.
 
 It also rejects fields whose role or writable selection range cannot be positively verified.
+
+The security gate runs before any completed-word snapshot and again before any delayed correction is applied. This second check prevents a pending correction from landing after focus has moved into a secure field.
 
 These checks are defense in depth. Secure or unknown fields receive normal pass-through input without context inspection.
 
