@@ -55,6 +55,13 @@ Provider output is validated locally before it can mutate text. Disabling Autoco
 
 Provider API keys are credentials, not typing data. They are stored only in macOS Keychain under the provider identifier and are never embedded in the repository or written to ordinary preferences.
 
+Two Keychain sharing modes are supported:
+
+- Developer ID builds use the shared application-group/data-protection Keychain path when the signed entitlement is available.
+- Free GitHub builds have no paid application-group entitlement, so they use the macOS file-based Keychain with an ACL that trusts only the installed Autocorrect input-method and settings executables.
+
+The free fallback does not move the API key into a plaintext file. It changes only the Keychain access-control mechanism used by the two local processes. Because legacy trusted-application identity is tied to the installed programs, an ad-hoc update can cause macOS to request Keychain authorization again.
+
 The settings UI never displays an existing stored API key. It only reports whether a credential exists, accepts a replacement key transiently, and clears the input after saving.
 
 ## Memory limitations
